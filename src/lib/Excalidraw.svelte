@@ -19,6 +19,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import "$lib/hotfix/processNotDefined.js";
+  import "@excalidraw/excalidraw/index.css";
 
   import ReactComponent from "./ReactComponent.svelte";
   type ExcalidrawElement = any;
@@ -114,13 +115,6 @@
     {/await}
   {/await}
 {/if}
-
-<svelte:head>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/@excalidraw/excalidraw@0.18.0/dist/prod/index.css"
-  />
-</svelte:head>
 
 <style>
   .loadingBox {
