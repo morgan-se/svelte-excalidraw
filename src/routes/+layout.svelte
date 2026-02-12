@@ -8,6 +8,7 @@
     { name: "🏠", path: "/" },
     { name: "Basic", path: "/basic" },
     { name: "Events", path: "/events" },
+    { name: "Children", path: "/children" },
   ];
 </script>
 

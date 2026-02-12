@@ -27,9 +27,7 @@
     <Excalidraw
       onChange={handleChange}
       onPointerUpdate={handlePointer}
-      gridModeEnabled={true}
       autoFocus={true}
-      name="Events Test"
     />
   </section>
 </main>

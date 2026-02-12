@@ -46,10 +46,12 @@
     viewModeEnabled?: boolean;
     zenModeEnabled?: boolean;
     gridModeEnabled?: boolean;
+    objectsSnapModeEnabled?: boolean;
     libraryReturnUrl?: string;
     theme?: "light" | "dark";
     name?: string;
     UIOptions?: AppProps["UIOptions"];
+    detectScroll?: boolean;
     handleKeyboardGlobally?: boolean;
     autoFocus?: boolean;
     onInit?: (api: ExcalidrawImperativeAPI) => void;
@@ -60,7 +62,12 @@
     ) => void;
     onPointerUpdate?: (pointerUpdate: OnPointerUpdateArgs) => void;
     onPointerDown?: (activeTool: string, pointerDownState: any) => void;
+    onPointerUp?: (activeTool: string, pointerDownState: any) => void;
     onScrollChange?: (scrollX: number, scrollY: number) => void;
+    onDuplicate?: (
+      nextElements: readonly ExcalidrawElement[],
+      prevElements: readonly ExcalidrawElement[]
+    ) => ExcalidrawElement[] | void;
     onPaste?: (data: DataTransfer, event: ClipboardEvent) => boolean | void;
     onLibraryChange?: (items: any[]) => void;
     generateLinkForSelection?: (
@@ -68,6 +75,9 @@
       appState: AppState
     ) => string | void;
     onLinkOpen?: (element: any, event: MouseEvent) => void;
+    onUserFollow?: (payload: { userToFollow: any; action: "FOLLOW" | "UNFOLLOW" }) => void;
+    onIncrement?: (event: any) => void;
+    renderTopLeftUI?: (isMobile: boolean, appState: AppState) => JSX.Element | null;
     renderTopRightUI?: (isMobile: boolean, appState: AppState) => JSX.Element;
     renderCustomStats?: (
       elements: readonly ExcalidrawElement[],
@@ -82,6 +92,19 @@
       | ((link: string) => boolean | undefined);
     renderEmbeddable?: (element: any) => JSX.Element | null;
     renderScrollbars?: boolean;
+    showDeprecatedFonts?: boolean;
+    /**
+     * Receives the loaded Excalidraw module; return React children (MainMenu, WelcomeScreen, Sidebar, Footer, etc.).
+     * When omitted, the library's default is used.
+     */
+    childrenBuilder?: (
+      mod: typeof import("@excalidraw/excalidraw")
+    ) => React.ReactNode;
+    /**
+     * React children to customize the UI. Supported components: MainMenu, WelcomeScreen,
+     * Sidebar, Footer, LiveCollaborationTrigger. When omitted, the library’s default is used.
+     * @see https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/children-components
+     */
   }
 
   function setAPI(api: ExcalidrawImperativeAPI) {
@@ -92,6 +115,7 @@
   let {
     excalidrawAPI = $bindable(undefined as any),
     onInit,
+    childrenBuilder,
     ...excalidrawProps
   }: Props = $props();
 </script>
@@ -99,20 +123,14 @@
 {#if browser}
   {#await import("@excalidraw/excalidraw")}
     <div class="loadingBox">Loading Excalidraw...</div>
-  {:then { Excalidraw }}
-    {#await import("@excalidraw/excalidraw").then((mod) => mod.MainMenu) then MainMenu}
-      <ReactComponent
-        excalidrawAPI={setAPI}
-        this={Excalidraw}
-        children={React.createElement(MainMenu, null, [
-          React.createElement(MainMenu.DefaultItems.SaveAsImage, {
-            key: "SaveAsImage",
-          }),
-          React.createElement(MainMenu.DefaultItems.Export, { key: "Export" }),
-        ])}
-        {...excalidrawProps}
-      />
-    {/await}
+  {:then mod}
+    {@const resolvedChildren = childrenBuilder?.(mod)}
+    <ReactComponent
+      excalidrawAPI={setAPI}
+      this={mod.Excalidraw}
+      children={resolvedChildren}
+      {...excalidrawProps}
+    />
   {/await}
 {/if}
 
