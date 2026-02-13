@@ -2,7 +2,7 @@
 
 ![banner](/README.excalidraw.svg)
 
-### Thin Svelte wrapper around [Excalidraw](https://github.com/excalidraw/excalidraw), the virtual whiteboard for sketching hand-drawn like diagrams.
+### Svelte wrapper for [Excalidraw](https://github.com/excalidraw/excalidraw), the virtual whiteboard for sketching hand-drawn like diagrams. With multiplayer.
 
 [Try it in SvelteLab](https://www.sveltelab.dev/yo9bz95u2mwe5m6)
 
