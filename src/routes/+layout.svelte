@@ -9,7 +9,13 @@
     { name: "Basic", path: "/basic" },
     { name: "Events", path: "/events" },
     { name: "Children", path: "/children" },
+    { name: "Multiplayer sse + kit remote 🔋", path: "/multiplayer" },
+    { name: "Multiplayer iframe", path: "/iframe" },
   ];
+
+  const pathname = $derived(pageState.url.pathname);
+  // is iframe embed
+  const isIframeEmbed = $derived(pathname.includes("/iframe/embed"));
 </script>
 
 <svelte:head>
@@ -17,13 +23,20 @@
 </svelte:head>
 
 <main>
-  <nav>
-    {#each pages as page}
-      <a class:active={pageState.url.pathname === page.path} href={page.path}
-        >{page.name}</a
-      >
-    {/each}
-  </nav>
+  {#if !isIframeEmbed}
+    <nav>
+      {#each pages as page}
+        <a
+          class:active={page.path.startsWith(pageState.url.pathname)}
+          href={page.path}
+        >
+          {page.name}
+        </a>
+      {/each}
+    </nav>
+  {:else}
+    <span></span>
+  {/if}
   <section>
     {@render children()}
   </section>

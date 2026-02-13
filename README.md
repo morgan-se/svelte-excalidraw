@@ -6,11 +6,25 @@
 
 [Try it in SvelteLab](https://www.sveltelab.dev/yo9bz95u2mwe5m6)
 
+> **⚠️ Install size:** The underlying `@excalidraw/excalidraw` dependency and its peers like mermaid are large. Install size is **~185MB** across **272 packages** ([pkg-size.dev/@excalidraw](https://pkg-size.dev/@excalidraw%2Fexcalidraw@0.18.0-3a5ef40)).
+
 ## Installation
 
 ```bash
 npm i svelte-excalidraw
 ```
+
+## Exports
+
+From `svelte-excalidraw`:
+
+- **`default`** — `<Excalidraw>` component (single-user canvas).
+- **`ExcalidrawMultiplayer`** — Svelte component for real-time collaborative rooms; requires an `adapter`, `roomId` and a `userInfo`.
+- **`createDefaultAdapter`**, **`DefaultAdapterOptions`** — Default SvelteKit adapter; pass `{ streamUrl: (roomId) => string }` (full URL per room).
+- **Types:** `RoomUserInfo`, `ExcalidrawMultiplayerAdapter`, `RoomConnection`, `RoomEvent`, `ExcalidrawDocument`, `AwarenessUpdate`.
+- **Sync helpers:** `getSyncableElements`, `isSyncableElement`, `DELETED_ELEMENT_TIMEOUT_MS`.
+
+User identity UI (provider, bar, pill) is **not** part of the package; provide `userInfo` yourself or copy the demo app’s layout (see this repo).
 
 ## Usage
 
@@ -83,6 +97,57 @@ Use the `childrenBuilder` prop: pass a function `(mod) => ...` that returns Reac
 
 See the [children example](src/routes/children/+page.svelte) in this repo (MainMenu with default items, groups, links, WelcomeScreen, Sidebar, Footer).
 
+## Multiplayer
+
+Real-time collaborative whiteboards: elements and cursors sync across clients. Two ways to use it:
+
+### Batteries included (SvelteKit)
+
+Use the built-in backend with no extra setup. The app ships with:
+
+- **Server → client:** [sveltekit-sse](https://github.com/razshare/sveltekit-sse) — room subscription as SSE; server sends initial document, element updates, and awareness (cursors).
+- **Client → server:** [SvelteKit Remote functions](https://svelte.dev/docs/kit/remote-functions) — push elements, push awareness. Server reconciles, optionally persists (e.g. to `data/excalidraw-rooms/{roomId}.json`), and broadcasts. Initial document is sent only over the stream (first SSE event: `init`).
+
+Requirements: SvelteKit app with **room state** and a **stream** endpoint. In this repo, the handler sits next to the room page: `src/routes/multiplayer/[roomId]/+server.ts` (re-exports the lib’s stream handler). Same path as the page; POST hits the stream. Wire up room state and remotes (see `src/lib/server/` in the repo). Pass an **adapter**: use the default one with a function that returns the full URL per room (e.g. `(roomId) => \`/multiplayer/${roomId}\``).
+
+```svelte
+<script>
+	import { page } from "$app/state";
+  import { ExcalidrawMultiplayer, createDefaultAdapter } from "svelte-excalidraw";
+</script>
+
+<ExcalidrawMultiplayer
+  adapter={createDefaultAdapter({ streamUrl: (roomId) => `/multiplayer/${roomId}` })}
+  roomId={page.params.roomId!}
+  userInfo={{ username: "Alice", color: { background: "#9775fa", stroke: "#9775fa" } }}
+/>
+```
+
+You supply `userInfo` (username + color). The demo app in this repo implements its own user UI (provider, bar, pill) in `src/routes/multiplayer/` — that code is not exported by the package. Run the app and open `/multiplayer` for the lobby.
+
+### Provide your own backend
+
+Use your own transport (WebSockets, Durable Objects, Firebase, etc.) by implementing the **adapter** interface. The same `<ExcalidrawMultiplayer>` component works with any backend that fulfills the contract.
+
+Implement `ExcalidrawMultiplayerAdapter` from `$lib/multiplayer/types.ts`:
+
+- **`join(roomId, userInfo)`** → `Promise<RoomConnection>`: connect to the room; return `{ userId, subscribe(), leave() }`. Your backend must send an **`init`** event first (with `document`, `userId`, `collaborators`) — that is the single source of truth for the initial document. `subscribe()` then yields further events: `elements`, `awareness`, `collaborator_joined` / `collaborator_left`, etc.
+- **`pushElements(roomId, userId, elements)`** — send syncable elements (lean payload).
+- **`pushAwareness(roomId, userId, awareness)`** — send cursor/pointer/selection.
+- Optional: `pushFiles`, `pushViewport`, `pushFollowState`, `updateUserInfo` for files, follow mode, and profile updates.
+
+Pass your adapter as the `adapter` prop:
+
+```svelte
+<ExcalidrawMultiplayer
+  roomId="my-room"
+  userInfo={{ username: "Alice" }}
+  adapter={myCustomAdapter}
+/>
+```
+
+The default SvelteKit stack is implemented as an adapter in the package; you can mirror that shape for WebSockets, Cloudflare Durable Objects, ZeroSync, or any other pipe.
+
 ## Development
 
 ```bash
@@ -97,8 +162,3 @@ npm run build
 npm run package
 npm pack
 ```
-
-## Credits
-
-- Powered by [Excalidraw](https://github.com/excalidraw/excalidraw?tab=readme-ov-file#readme) & [Svelte](https://svelte.dev/)
-- Wrapped for Svelte by [TipS](https://tips.dev/)
