@@ -32,7 +32,7 @@
     Gesture,
   } from "@excalidraw/excalidraw/types";
 
-  import React, { type JSX } from "react";
+  import type { JSX, ReactNode } from "react";
 
   // https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/props/
   interface Props {
@@ -58,7 +58,7 @@
     onChange?: (
       elements: OnChangeArgs["elements"],
       appState: OnChangeArgs["appState"],
-      files: OnChangeArgs["files"]
+      files: OnChangeArgs["files"],
     ) => void;
     onPointerUpdate?: (pointerUpdate: OnPointerUpdateArgs) => void;
     onPointerDown?: (activeTool: string, pointerDownState: any) => void;
@@ -66,22 +66,28 @@
     onScrollChange?: (scrollX: number, scrollY: number) => void;
     onDuplicate?: (
       nextElements: readonly ExcalidrawElement[],
-      prevElements: readonly ExcalidrawElement[]
+      prevElements: readonly ExcalidrawElement[],
     ) => ExcalidrawElement[] | void;
     onPaste?: (data: DataTransfer, event: ClipboardEvent) => boolean | void;
     onLibraryChange?: (items: any[]) => void;
     generateLinkForSelection?: (
       elements: readonly ExcalidrawElement[],
-      appState: AppState
+      appState: AppState,
     ) => string | void;
     onLinkOpen?: (element: any, event: MouseEvent) => void;
-    onUserFollow?: (payload: { userToFollow: any; action: "FOLLOW" | "UNFOLLOW" }) => void;
+    onUserFollow?: (payload: {
+      userToFollow: any;
+      action: "FOLLOW" | "UNFOLLOW";
+    }) => void;
     onIncrement?: (event: any) => void;
-    renderTopLeftUI?: (isMobile: boolean, appState: AppState) => JSX.Element | null;
+    renderTopLeftUI?: (
+      isMobile: boolean,
+      appState: AppState,
+    ) => JSX.Element | null;
     renderTopRightUI?: (isMobile: boolean, appState: AppState) => JSX.Element;
     renderCustomStats?: (
       elements: readonly ExcalidrawElement[],
-      appState: AppState
+      appState: AppState,
     ) => JSX.Element;
     generateIdForFile?: (file: File) => string;
     validateEmbeddable?:
@@ -98,8 +104,8 @@
      * When omitted, the library's default is used.
      */
     childrenBuilder?: (
-      mod: typeof import("@excalidraw/excalidraw")
-    ) => React.ReactNode;
+      mod: typeof import("@excalidraw/excalidraw"),
+    ) => ReactNode;
     /**
      * React children to customize the UI. Supported components: MainMenu, WelcomeScreen,
      * Sidebar, Footer, LiveCollaborationTrigger. When omitted, the library’s default is used.
@@ -120,26 +126,34 @@
   }: Props = $props();
 </script>
 
-{#if browser}
-  {#await import("@excalidraw/excalidraw")}
-    <div class="loadingBox">Loading Excalidraw...</div>
-  {:then mod}
-    {@const resolvedChildren = childrenBuilder?.(mod)}
-    <ReactComponent
-      excalidrawAPI={setAPI}
-      this={mod.Excalidraw}
-      children={resolvedChildren}
-      {...excalidrawProps}
-    />
-  {/await}
-{/if}
+<div class="excalidraw-root">
+  {#if browser}
+    {#await import("@excalidraw/excalidraw")}
+      <div class="loadingBox">Loading Excalidraw...</div>
+    {:then mod}
+      {@const resolvedChildren = childrenBuilder?.(mod)}
+      <ReactComponent
+        excalidrawAPI={setAPI}
+        this={mod.Excalidraw}
+        children={resolvedChildren}
+        {...excalidrawProps}
+      />
+    {/await}
+  {/if}
+</div>
 
 <style>
+  .excalidraw-root {
+    /* Works by default in any app: no parent height required. */
+    min-height: 60vh;
+    height: 100%;
+  }
   .loadingBox {
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100%;
+    min-height: 300px;
     font-size: 1.5rem;
   }
 </style>

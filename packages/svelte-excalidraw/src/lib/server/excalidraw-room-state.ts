@@ -64,6 +64,14 @@ const PERSIST_DEBOUNCE_MS = 500;
 let persistCallback: ((roomId: string, doc: RoomDocument) => void) | null = null;
 let loadCallback: ((roomId: string) => RoomDocument | null) | null = null;
 
+/** True if persist/load callbacks have been set (e.g. by app or registerFileStorage). */
+export function hasPersistenceConfigured(): boolean {
+	return loadCallback !== null;
+}
+
+/** Pending initial document for the next getOrCreateRoom(roomId). Used when host joins with file-system doc. */
+const pendingInitialDocs = new Map<string, RoomDocument>();
+
 export function setPersistCallback(cb: (roomId: string, doc: RoomDocument) => void) {
 	persistCallback = cb;
 }
@@ -72,12 +80,31 @@ export function setLoadCallback(cb: (roomId: string) => RoomDocument | null) {
 	loadCallback = cb;
 }
 
+/** Set initial document for a room before the first join. Cleared after getOrCreateRoom uses it. */
+export function setPendingInitialDoc(roomId: string, doc: RoomDocument): void {
+	pendingInitialDocs.set(roomId, doc);
+}
+
+type OnLeaveResult = void | { closeRoom: true };
+let onLeaveCallback: ((roomId: string, userId: string) => OnLeaveResult) | null = null;
+
+/** Called when a user leaves a room. Return { closeRoom: true } to broadcast host_left and delete room (e.g. local host left). */
+export function setOnLeaveCallback(cb: (roomId: string, userId: string) => OnLeaveResult): void {
+	onLeaveCallback = cb;
+}
+
 function getOrCreateRoom(roomId: string): RoomData {
 	let room = rooms.get(roomId);
 	if (!room) {
 		let elements: ElementLike[] = [];
 		let files: Record<string, unknown> = {};
-		if (loadCallback) {
+		const pending = pendingInitialDocs.get(roomId);
+		if (pending) {
+			pendingInitialDocs.delete(roomId);
+			elements = (pending.elements ?? []) as ElementLike[];
+			files = pending.files ?? {};
+			elements = normalizeImageElements(elements, files);
+		} else if (loadCallback) {
 			const loaded = loadCallback(roomId);
 			if (loaded) {
 				elements = loaded.elements ?? [];
@@ -294,6 +321,10 @@ export function broadcastViewport(
 	});
 }
 
+export function roomExists(roomId: string): boolean {
+	return rooms.has(roomId);
+}
+
 export function getRoomDocument(roomId: string): {
 	elements: ElementLike[];
 	files: Record<string, unknown>;
@@ -308,6 +339,12 @@ export function leaveRoom(roomId: string, userId: string): void {
 	if (!room) return;
 	room.followState.delete(userId);
 	room.clients.delete(userId);
+	const result = onLeaveCallback?.(roomId, userId);
+	if (result?.closeRoom) {
+		room.clients.forEach((c) => c.emit("message", JSON.stringify({ type: "host_left" })));
+		rooms.delete(roomId);
+		return;
+	}
 	const payload = JSON.stringify({ type: "collaborator_left", userId });
 	room.clients.forEach((c) => c.emit("message", payload));
 	if (room.clients.size === 0) rooms.delete(roomId);

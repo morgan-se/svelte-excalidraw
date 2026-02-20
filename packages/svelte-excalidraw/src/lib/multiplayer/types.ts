@@ -54,6 +54,7 @@ export type RoomEvent =
 	| { type: "collaborator_joined"; collaborator: Collaborator }
 	| { type: "collaborator_updated"; collaborator: Collaborator }
 	| { type: "collaborator_left"; userId: string }
+	| { type: "host_left" }
 	| { type: "sync"; userId: string; collaborators: Readonly<Record<string, Collaborator>> };
 
 /** Result of joining a room: your id and a stream of room events */

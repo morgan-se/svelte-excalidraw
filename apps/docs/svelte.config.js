@@ -1,6 +1,7 @@
-import adapter from "@sveltejs/adapter-static";
+import adapter from "@sveltejs/adapter-node";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { mdsvex } from "mdsvex";
+import rehypeHeadingId from "./src/lib/rehype-heading-id.js";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { highlighter } from "./src/lib/code-highlighter.js";
@@ -16,7 +17,8 @@ const config = {
 		mdsvex({
 			extensions: ['.md'],
 			layout: { _: mdLayout },
-			highlight: { highlighter }
+			highlight: { highlighter },
+			rehypePlugins: [rehypeHeadingId]
 		})
 	],
 	kit: {

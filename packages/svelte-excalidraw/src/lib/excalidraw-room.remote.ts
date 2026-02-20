@@ -1,8 +1,6 @@
-/**
- * Remote functions for the default Excalidraw multiplayer backend.
- * Server-only: no imports from @excalidraw so this module never loads browser-only code.
- */
-import { query, command } from "$app/server";
+import * as v from "valibot";
+import { command } from "$app/server";
+import { elementsArraySchema } from "./element-schema.js";
 import {
 	applyElements,
 	applyFiles,
@@ -11,79 +9,82 @@ import {
 	broadcastViewport,
 	setFollowState,
 } from "./server/excalidraw-room-state.js";
-import {
-	listRoomsWithStats,
-	deleteRoomFile,
-} from "./server/excalidraw-room-file-storage.js";
-import { deleteRoomData } from "./server/excalidraw-room-state.js";
 
-export const listRooms = query("unchecked", async () => {
-	return listRoomsWithStats();
+const roomUserId = {
+	roomId: v.pipe(v.string(), v.minLength(1)),
+	userId: v.pipe(v.string(), v.minLength(1)),
+};
+
+const pushElementsSchema = v.object({
+	...roomUserId,
+	elements: elementsArraySchema,
 });
 
-export const deleteRoom = command("unchecked", async (roomId: string) => {
-	deleteRoomData(roomId);
-	await deleteRoomFile(roomId);
+const fileEntrySchema = v.object({
+	mimeType: v.string(),
+	id: v.string(),
+	dataURL: v.string(),
+	created: v.optional(v.number()),
+	lastRetrieved: v.optional(v.number()),
 });
 
-export const pushElements = command(
-	"unchecked",
-	async (payload: { roomId: string; userId: string; elements: readonly Record<string, unknown>[] }) => {
-		applyElements(payload.roomId, payload.userId, payload.elements);
-	},
-);
+const pushFilesSchema = v.object({
+	...roomUserId,
+	files: v.record(v.string(), fileEntrySchema),
+});
 
-export const pushFiles = command(
-	"unchecked",
-	async (payload: {
-		roomId: string;
-		userId: string;
-		files: Record<string, { mimeType: string; id: string; dataURL: string; created?: number; lastRetrieved?: number }>;
-	}) => {
-		applyFiles(payload.roomId, payload.userId, payload.files);
-	},
-);
+const pushViewportSchema = v.object({
+	...roomUserId,
+	sceneBounds: v.tuple([v.number(), v.number(), v.number(), v.number()]),
+});
 
-export const pushViewport = command(
-	"unchecked",
-	async (payload: {
-		roomId: string;
-		userId: string;
-		sceneBounds: [number, number, number, number];
-	}) => {
-		broadcastViewport(payload.roomId, payload.userId, payload.sceneBounds);
-	},
-);
+const pushFollowStateSchema = v.object({
+	...roomUserId,
+	followingUserId: v.nullable(v.string()),
+});
 
-export const pushFollowState = command(
-	"unchecked",
-	async (payload: {
-		roomId: string;
-		userId: string;
-		followingUserId: string | null;
-	}) => {
-		setFollowState(payload.roomId, payload.userId, payload.followingUserId);
-	},
-);
+const updateUserInfoSchema = v.object({
+	...roomUserId,
+	userInfo: v.object({
+		username: v.string(),
+		color: v.optional(v.object({ background: v.string(), stroke: v.string() })),
+		avatarUrl: v.optional(v.string()),
+	}),
+});
 
-export const updateUserInfo = command(
-	"unchecked",
-	async (payload: {
-		roomId: string;
-		userId: string;
-		userInfo: { username: string; color?: { background: string; stroke: string }; avatarUrl?: string };
-	}) => {
-		updateCollaborator(payload.roomId, payload.userId, payload.userInfo);
-	},
-);
+const pushAwarenessSchema = v.object({
+	...roomUserId,
+	awareness: v.object({
+		pointer: v.object({
+			x: v.number(),
+			y: v.number(),
+			tool: v.picklist(["pointer", "laser"]),
+		}),
+		button: v.optional(v.picklist(["up", "down"])),
+		selectedElementIds: v.optional(v.record(v.string(), v.literal(true))),
+	}),
+});
 
-export const pushAwareness = command(
-	"unchecked",
-	async (payload: {
-		roomId: string;
-		userId: string;
-		awareness: { pointer: { x: number; y: number; tool: "pointer" | "laser" }; button?: "up" | "down"; selectedElementIds?: Readonly<Record<string, true>> };
-	}) => {
-		broadcastAwareness(payload.roomId, payload.userId, payload.awareness);
-	},
-);
+export const pushElements = command(pushElementsSchema, async (payload) => {
+	applyElements(payload.roomId, payload.userId, payload.elements);
+});
+
+export const pushFiles = command(pushFilesSchema, async (payload) => {
+	applyFiles(payload.roomId, payload.userId, payload.files);
+});
+
+export const pushViewport = command(pushViewportSchema, async (payload) => {
+	broadcastViewport(payload.roomId, payload.userId, payload.sceneBounds);
+});
+
+export const pushFollowState = command(pushFollowStateSchema, async (payload) => {
+	setFollowState(payload.roomId, payload.userId, payload.followingUserId);
+});
+
+export const updateUserInfo = command(updateUserInfoSchema, async (payload) => {
+	updateCollaborator(payload.roomId, payload.userId, payload.userInfo);
+});
+
+export const pushAwareness = command(pushAwarenessSchema, async (payload) => {
+	broadcastAwareness(payload.roomId, payload.userId, payload.awareness);
+});

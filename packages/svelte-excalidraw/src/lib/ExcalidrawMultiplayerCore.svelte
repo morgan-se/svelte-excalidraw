@@ -30,9 +30,13 @@
 		adapter: ExcalidrawMultiplayerAdapter;
 		theme?: "light" | "dark";
 		UIOptions?: import("@excalidraw/excalidraw/types").AppProps["UIOptions"];
+		/** When true, receive updates and show collaborators but do not push edits (view-only). */
+		viewOnly?: boolean;
+		/** Called when join fails (e.g. 403). Use to show "Access denied" and link. */
+		onJoinError?: (error: unknown) => void;
 	}
 
-	let { roomId, userInfo, adapter, theme, UIOptions }: Props = $props();
+	let { roomId, userInfo, adapter, theme, UIOptions, viewOnly, onJoinError }: Props = $props();
 
 	const session = createMultiplayerSessionState();
 	let excalidrawAPI = $state<ExcalidrawImperativeAPI | undefined>(undefined);
@@ -40,6 +44,7 @@
 	let lastBroadcastedSceneVersion = 0;
 	let connectionCleanup: (() => void) | null = null;
 	let syncPipeline: ReturnType<typeof createSyncPipeline> | null = null;
+	let roomClosed = $state(false);
 
 	onMount(() => {
 		if (!browser || !roomId) return;
@@ -51,6 +56,7 @@
 			roomId,
 			userInfo,
 			callbacks: {
+				onJoinError,
 				onConnected(conn) {
 					session.connection = conn;
 				},
@@ -109,6 +115,9 @@
 							viewportZoomFactor: 1,
 						}).appState,
 					});
+				},
+				onRoomClosed() {
+					roomClosed = true;
 				},
 			},
 		});
@@ -173,13 +182,20 @@
 	});
 </script>
 
+{#if roomClosed}
+	<div class="host-left-message">
+		<p>Host left. The room is closed.</p>
+	</div>
+{:else}
 <Excalidraw
 	bind:excalidrawAPI
 	initialData={session.initialData}
 	isCollaborating={true}
+	viewModeEnabled={viewOnly ?? false}
 	{theme}
 	{UIOptions}
 	onChange={(elements, _appState, files) => {
+		if (viewOnly) return;
 		const sceneVersion = hashElementsVersion(elements);
 		// Skip only if we already pushed this exact version (avoid duplicate push).
 		if (sceneVersion === lastBroadcastedSceneVersion) return;
@@ -210,3 +226,21 @@
 		syncPipeline.handleViewportChange(roomId, conn.userId, sceneBounds);
 	}}
 />
+{/if}
+
+<style>
+	.host-left-message {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 200px;
+		padding: 2rem;
+		background: var(--color-bg-container, #1e1e1e);
+		color: var(--color-text-primary, #eee);
+		border-radius: 8px;
+	}
+	.host-left-message p {
+		margin: 0;
+		font-size: 1rem;
+	}
+</style>

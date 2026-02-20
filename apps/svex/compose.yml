@@ -1,0 +1,23 @@
+# Run from repo root: docker compose -f apps/svex/compose.yml up -d
+# Env: SVEX_CONFIG_JSON = JSON (optional). Use YAML block for multiline.
+services:
+  svex:
+    image: tips-services/svex
+    build:
+      context: ../..
+      dockerfile: apps/svex/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      SVEX_CONFIG_JSON: |
+        {
+          "local": {"enabled": true},
+          "ephemeral": {"enabled": true, "ttlHours": 48, "createAllowedFor": "trusted"},
+          "workspace": {"enabled": true, "createAllowedFor": "trusted"}
+        }
+    volumes:
+      - svex-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  svex-data:

@@ -4,18 +4,11 @@ title: Examples
 
 # Examples
 
-Example apps that use svelte-excalidraw with different backends and patterns.
+Runnable examples that use svelte-excalidraw with different patterns.
 
-## BetterAuth
+## Run the examples
 
-`examples/betterauth` — SvelteKit app with <a href="https://www.better-auth.com/" target="_blank" rel="noopener">BetterAuth</a>: session-based auth, protected multiplayer route. POST uses auth then calls `handleExcalidrawStream`; remotes are registered; optional auth on commands. See the example README for how auth is wired.
-
-## Zero backend
-
-`examples/zero-sync` — Alternative backend (ZeroSync or “zero” architecture) with the same `ExcalidrawMultiplayer` component and a custom adapter.
-
-## Iframe embed
-
-`examples/iframe-embed` — Minimal host + embed setup if you need the canvas in an iframe. Includes instructions in the README and in the docs.
-
-<p class="note">These examples live in the repo under <code>examples/</code>. Run them from the monorepo root or from each example directory as described in their README.</p>
+- **[Basic](/examples/basic)**: Single canvas with initial data (one rectangle). Minimal setup.
+- **[Events](/examples/events)**: `onChange` and `onPointerUpdate` handlers with live feedback.
+- **[Children](/examples/children)**: Custom main menu, welcome screen, sidebar, and footer (React children / slots).
+- **[Multiplayer iframe](/examples/iframe)**: Two iframes sharing one room via a **custom adapter** (postMessage). No server: the parent window holds room state and broadcasts to both iframes.

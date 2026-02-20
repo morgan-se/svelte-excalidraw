@@ -9,9 +9,10 @@
   "scripts": {
     "build": "npm run build:lib && npm run build:apps",
     "build:lib": "npm run build -w svelte-excalidraw",
-    "build:apps": "npm run build -w demo -w starter -w svelte-excalidraw-docs",
-    "dev:demo": "npm run dev -w demo",
+    "build:apps": "npm run build -w svelte-excalidraw-docs -w svex",
     "dev:docs": "npm run dev -w svelte-excalidraw-docs",
-    "dev:starter": "npm run dev -w starter"
+    "dev:lib": "npm run dev -w svelte-excalidraw",
+    "dev:starter": "npm run dev -w starter",
+    "dev:svex": "npm run dev -w svex"
   }
 }

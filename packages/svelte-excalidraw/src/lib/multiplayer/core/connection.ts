@@ -16,6 +16,10 @@ export interface ConnectionCallbacks {
 	onFiles(files: Readonly<Record<string, unknown>>): void;
 	onFollowedBy(followedBy: string[]): void;
 	onViewport(userId: string, sceneBounds: [number, number, number, number]): void;
+	/** Called when room is closed by host (local rooms). Hide canvas and show message. */
+	onRoomClosed?(): void;
+	/** Called when join fails (e.g. 403 Forbidden). Use to show "Access denied" and link to workspace. */
+	onJoinError?(error: unknown): void;
 }
 
 export interface StartConnectionOptions {
@@ -94,9 +98,13 @@ export async function startConnection(
 				case "viewport":
 					callbacks.onViewport(ev.userId, ev.sceneBounds);
 					break;
+				case "host_left":
+					callbacks.onRoomClosed?.();
+					break;
 			}
 		}
 	} catch (e) {
 		console.error("[ExcalidrawMultiplayer] join error", e);
+		callbacks.onJoinError?.(e);
 	}
 }

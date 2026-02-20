@@ -5,7 +5,7 @@
  *
  * Layout: data/excalidraw-rooms/{roomId}/scene.json, data/excalidraw-rooms/{roomId}/files/{fileId}
  */
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -138,35 +138,6 @@ export async function deleteRoomFile(roomId: string): Promise<void> {
 	} catch {
 		// ignore
 	}
-}
-
-/** Room list entry with id and last-modified time (ms since epoch). */
-export type RoomListItem = { id: string; updatedAt: number };
-
-/** List persisted rooms (dirs with scene.json). */
-export function listRoomsWithStats(): RoomListItem[] {
-	try {
-		const names = readdirSync(ROOMS_DIR, { withFileTypes: true });
-		const entries: RoomListItem[] = [];
-		for (const d of names) {
-			if (!d.isDirectory()) continue;
-			const id = d.name;
-			if (safeRoomId(id) !== id) continue;
-			try {
-				const stat = statSync(join(ROOMS_DIR, id, SCENE_FILE));
-				entries.push({ id, updatedAt: stat.mtimeMs });
-			} catch {
-				entries.push({ id, updatedAt: 0 });
-			}
-		}
-		return entries.sort((a, b) => b.updatedAt - a.updatedAt);
-	} catch {
-		return [];
-	}
-}
-
-export function listRoomIds(): string[] {
-	return listRoomsWithStats().map((r) => r.id);
 }
 
 /** Load room from disk (split layout). Use when room is not in memory. */

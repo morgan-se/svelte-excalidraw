@@ -2,56 +2,35 @@
 title: Getting started
 ---
 
-<script>
-  import CodeAndPreview from '$lib/CodeAndPreview.svelte';
-  import * as Minimal from '$lib/examples/minimal.js';
-  import * as InitialData from '$lib/examples/initial-data.js';
-</script>
-
 # Getting started
 
-## Install
+This guide gets you from zero to a working Excalidraw whiteboard in your Svelte app. By the end, you'll have either a **single-player** canvas (no server) or a **multiplayer** canvas with real-time collaboration.
 
 ```bash
 npm install svelte-excalidraw
 ```
 
-Peer dependencies: `svelte` ^5, `@excalidraw/excalidraw`, `react`, `react-dom` (used internally by Excalidraw).
+> **node_modules size:** The underlying `@excalidraw/excalidraw` dependency is large (**~185MB** across 272 packages). See [pkg-size.dev](https://pkg-size.dev/@excalidraw%2Fexcalidraw@0.18.0-3a5ef40) for details.
 
-> **⚠️ Install size:** The underlying `@excalidraw/excalidraw` dependency and its peers (e.g. mermaid) are large. Install size is **~185MB** across 272 packages ([pkg-size.dev](https://pkg-size.dev/@excalidraw%2Fexcalidraw@0.18.0-3a5ef40)).
+---
 
-## Minimal example
+## Path A: Single-player (no server)
 
-A single-player canvas with no server: import and render.
+Import `Excalidraw`, render it in a page. No server or config. See the [Examples](/examples) for minimal setup and more patterns.
 
-<CodeAndPreview example={Minimal} />
+---
 
-## A bit more: initial data, grid, theme
+## Path B: Multiplayer (real-time collaboration)
 
-Pass `initialData` to preload elements and app state, and use props like `theme`, `gridModeEnabled`, and `viewModeEnabled` to tune the canvas.
+For shared cursors and live element sync, follow the **[Multiplayer guide](/multiplayer/guide)**: step-by-step from `npx sv create` to a working whiteboard with lobby, stream route, and file-system persistence.
 
-<CodeAndPreview example={InitialData} />
+---
 
-You can add more elements, set `theme="dark"`, enable `zenModeEnabled`, and use `onChange` to persist or react to edits. See the [API reference](/api) for all props.
+## Next steps
 
-## Multiplayer
-
-For most apps you want **real-time collaboration**: shared cursors, live elements and persistence. Two ways to do it:
-
-**Batteries included (SvelteKit)** — Use the built-in backend: a POST endpoint that calls `handleExcalidrawStream` from `svelte-excalidraw/server`, remotes for push (elements, awareness), and `ExcalidrawMultiplayer` with `createDefaultAdapter`. No extra transport; you wire the stream URL and register the remotes.
-
-```svelte
-<script>
-  import { ExcalidrawMultiplayer, createDefaultAdapter } from "svelte-excalidraw";
-</script>
-
-<ExcalidrawMultiplayer
-  roomId="my-room"
-  userInfo={{ username: "Alice", color: { background: "#9775fa", stroke: "#9775fa" } }}
-  adapter={createDefaultAdapter({ streamUrl: (roomId) => `/multiplayer/${roomId}` })}
-/>
-```
-
-**Your own backend** — Use the same `ExcalidrawMultiplayer` component with a custom adapter (WebSockets, Durable Objects, Firebase, etc.). Implement the adapter interface; the [Multiplayer](/multiplayer) page has the contract and details.
-
-For full setup (stream, remotes, persistence, adapter options), see **[Multiplayer](/multiplayer)**.
+| Goal | Where to go |
+|------|-------------|
+| See more single-player patterns | [Examples](/examples): events, children, custom UI |
+| Understand the multiplayer flow | [Multiplayer guide](/multiplayer/guide): full walkthrough with lobby |
+| Use a custom backend | [Adapters](/multiplayer/adapters): WebSocket, postMessage, etc. |
+| API reference | [Components](/api/components), [Multiplayer](/api/multiplayer) |

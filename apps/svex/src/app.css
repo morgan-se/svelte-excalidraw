@@ -1,0 +1,29 @@
+/* Match docs app: dark theme + primary (accent) */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	line-height: 1.5;
+}
+
+:root {
+	--font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+	--bg: #0f0f12;
+	--text: #e4e4e7;
+	--muted: #a1a1aa;
+	--border: #27272a;
+	--accent: #fc6241;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	font-family: var(--font-sans);
+	font-size: 1rem;
+	background: var(--bg);
+	color: var(--text);
+}
