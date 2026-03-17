@@ -1,7 +1,6 @@
 /**
  * Persist FileSystemDirectoryHandle in IndexedDB so we can restore after reload.
- * Chrome and other browsers that support the File System Access API allow storing
- * handles in IndexedDB.
+ * IndexedDB is the only browser storage that can hold FileSystemHandle.
  */
 const DB_NAME = "svex";
 const STORE = "local-workspace";
@@ -31,10 +30,9 @@ export async function saveLocalDirToIndexedDB(
 	handle: FileSystemDirectoryHandle,
 ): Promise<void> {
 	const db = await openDb();
-	return new Promise((resolve, reject) => {
+	await new Promise<void>((resolve, reject) => {
 		const tx = db.transaction(STORE, "readwrite");
-		const store = tx.objectStore(STORE);
-		store.put({ workspaceId, handle }, KEY);
+		tx.objectStore(STORE).put({ workspaceId, handle }, KEY);
 		tx.oncomplete = () => {
 			db.close();
 			resolve();
@@ -48,28 +46,27 @@ export async function saveLocalDirToIndexedDB(
 
 export async function loadLocalDirFromIndexedDB(): Promise<StoredLocalWorkspace | null> {
 	const db = await openDb();
-	return new Promise((resolve, reject) => {
+	const v = await new Promise<unknown>((resolve, reject) => {
 		const tx = db.transaction(STORE, "readonly");
 		const req = tx.objectStore(STORE).get(KEY);
 		tx.oncomplete = () => {
 			db.close();
-			const v = req.result;
-			if (v && typeof v === "object" && v.workspaceId && v.handle) {
-				resolve({ workspaceId: v.workspaceId, handle: v.handle as FileSystemDirectoryHandle });
-			} else {
-				resolve(null);
-			}
+			resolve(req.result);
 		};
 		tx.onerror = () => {
 			db.close();
 			reject(tx.error);
 		};
 	});
+	if (v && typeof v === "object" && "workspaceId" in v && "handle" in v) {
+		return { workspaceId: (v as StoredLocalWorkspace).workspaceId, handle: (v as StoredLocalWorkspace).handle };
+	}
+	return null;
 }
 
 export async function clearLocalDirFromIndexedDB(): Promise<void> {
 	const db = await openDb();
-	return new Promise((resolve, reject) => {
+	await new Promise<void>((resolve, reject) => {
 		const tx = db.transaction(STORE, "readwrite");
 		tx.objectStore(STORE).delete(KEY);
 		tx.oncomplete = () => {
@@ -83,16 +80,22 @@ export async function clearLocalDirFromIndexedDB(): Promise<void> {
 	});
 }
 
-/** Verify we still have permission to use the directory (e.g. after restore). */
+/** Handles restored from IndexedDB lose method binding; call via prototype. */
+function queryPermission(handle: FileSystemHandle, mode: "read" | "readwrite"): Promise<PermissionState> {
+	return FileSystemHandle.prototype.queryPermission.call(handle, { mode });
+}
+
+function requestPermission(handle: FileSystemHandle, mode: "read" | "readwrite"): Promise<PermissionState> {
+	return FileSystemHandle.prototype.requestPermission.call(handle, { mode });
+}
+
 export async function verifyDirHandle(handle: FileSystemDirectoryHandle): Promise<boolean> {
 	try {
-		const perm = await handle.queryPermission({ mode: "readwrite" });
+		const perm = await queryPermission(handle, "readwrite");
 		if (perm === "granted") return true;
-		if (perm === "prompt") {
-			const granted = await handle.requestPermission({ mode: "readwrite" });
-			return granted === "granted";
-		}
-		return false;
+		// Re-request when "prompt" or "denied" (e.g. revoked after tab was backgrounded).
+		const granted = await requestPermission(handle, "readwrite");
+		return granted === "granted";
 	} catch {
 		return false;
 	}

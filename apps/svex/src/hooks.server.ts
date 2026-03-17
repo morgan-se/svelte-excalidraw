@@ -1,6 +1,3 @@
-/**
- * Persist/load for ephemeral and forever rooms; lifecycle cleanup; onLeave for local host.
- */
 import type { Handle } from "@sveltejs/kit";
 import { getDb } from "$lib/server/storage/db.js";
 import { ensureAdminUpgradeCodeAndLog } from "$lib/server/auth/upgrade-code.js";

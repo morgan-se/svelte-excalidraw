@@ -332,7 +332,8 @@
 									variant="whiteboard"
 									mode="workspace"
 									name={meta?.name ?? id}
-									updatedAt={meta.lastUpdatedAt}
+									createdAt={meta?.createdAt ?? null}
+									updatedAt={meta?.lastUpdatedAt ?? null}
 									formatDateAgo={formatDateAgo}
 									onclick={() => openWhiteboard(id)}
 									sid={sid}

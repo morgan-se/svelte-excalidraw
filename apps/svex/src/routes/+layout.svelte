@@ -3,11 +3,7 @@
 	import "$lib/../app.css";
 	import favicon from "$lib/assets/favicon.png";
 	import { setLocalWorkspace } from "$lib/client/local/local-workspace.js";
-	import {
-		loadLocalDirFromIndexedDB,
-		verifyDirHandle,
-		clearLocalDirFromIndexedDB,
-	} from "$lib/client/local/local-dir-persistence.js";
+	import { loadLocalDirFromIndexedDB, verifyDirHandle } from "$lib/client/local/local-dir-persistence.js";
 
 	let { data, children } = $props();
 
@@ -15,12 +11,11 @@
 		(async () => {
 			const stored = await loadLocalDirFromIndexedDB();
 			if (!stored) return;
-			const ok = await verifyDirHandle(stored.handle);
-			if (ok) {
+			if (await verifyDirHandle(stored.handle)) {
 				setLocalWorkspace(stored.workspaceId, stored.handle);
-			} else {
-				await clearLocalDirFromIndexedDB();
 			}
+			// When verification fails (e.g. permission revoked after tab was backgrounded),
+			// keep the handle in IndexedDB so the whiteboard page can try to re-request access.
 		})();
 	}
 </script>

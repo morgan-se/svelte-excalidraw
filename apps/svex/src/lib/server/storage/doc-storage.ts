@@ -3,11 +3,12 @@
  * - workspaceId/docId → data/workspaces/<workspaceId>/<docId>/
  * - ephemeral id → data/ephemerals/<id>/
  * - local (remote-*) → never on disk.
- * Meta lives in SQLite (room-meta-db); scene in scene.json only.
+ * Scene JSON holds svexMeta (createdAt, updatedAt, etc.); SQLite is a fast index, file is source of truth.
  */
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { RoomMetadata } from "$lib/core/types/workspace-types.js";
+import { getSvexMeta, ensureSvexMetaForSave, roomMetadataFromSvexMeta, SVEX_META_KEY } from "$lib/core/scene-meta.js";
 import { getConfig } from "../config.js";
 import { getRoomMetadata, setRoomMetadataFromLoad, touchRoom, touchViewedAt } from "../room-ttl.js";
 import { getWhiteboard, deleteWhiteboard } from "./room-meta-db.js";
@@ -15,7 +16,7 @@ import { WORKSPACES_DIR, EPHEMERALS_DIR } from "./data-dir.js";
 
 const SCENE_FILE = "scene.json";
 
-type RoomDocument = { elements: unknown[]; files: Record<string, unknown> };
+type RoomDocument = { elements: unknown[]; files: Record<string, unknown>; [key: string]: unknown };
 
 function safeSegment(s: string): string {
 	return /^[a-zA-Z0-9_-]+$/.test(s) && s.length <= 128 ? s : "";
@@ -113,9 +114,12 @@ export function loadRoom(roomId: string): RoomDocument | null {
 		if (!existsSync(scenePath)) return null;
 		const raw = readFileSync(scenePath, "utf-8");
 		const doc = JSON.parse(raw) as RoomDocument;
-		const meta = getWhiteboard(roomId);
-		if (meta) {
-			setRoomMetadataFromLoad(roomId, meta);
+		const fileMeta = getSvexMeta(doc);
+		if (fileMeta) {
+			setRoomMetadataFromLoad(roomId, roomMetadataFromSvexMeta(fileMeta));
+		} else {
+			const meta = getWhiteboard(roomId);
+			if (meta) setRoomMetadataFromLoad(roomId, meta);
 		}
 		touchViewedAt(roomId);
 		return doc;
@@ -124,13 +128,23 @@ export function loadRoom(roomId: string): RoomDocument | null {
 	}
 }
 
-/** Save room to disk. Returns true if saved, false if rejected (size limit) or failed. */
+/** Save room to disk. Ensures svexMeta in doc (file is source of truth); writes svexMeta first in JSON. Returns true if saved. */
 export function saveRoom(roomId: string, doc: RoomDocument): boolean {
 	const dir = roomIdToDocDir(roomId);
 	if (!dir) return false;
-	const config = getConfig().storage;
-	const docStr = JSON.stringify(doc);
+	const now = Date.now();
+	ensureSvexMetaForSave(doc, now, getRoomMetadata(roomId));
+	const d = doc as Record<string, unknown>;
+	const ordered =
+		typeof d[SVEX_META_KEY] !== "undefined"
+			? {
+					[SVEX_META_KEY]: d[SVEX_META_KEY],
+					...Object.fromEntries(Object.entries(d).filter(([k]) => k !== SVEX_META_KEY)),
+				}
+			: doc;
+	const docStr = JSON.stringify(ordered);
 	const docSize = Buffer.byteLength(docStr, "utf8");
+	const config = getConfig().storage;
 	const maxPerWhiteboard =
 		roomIdToWorkspaceId(roomId) != null
 			? config.maxSizePerWorkspaceWhiteboardBytes

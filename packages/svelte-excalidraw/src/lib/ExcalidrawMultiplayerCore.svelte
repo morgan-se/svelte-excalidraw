@@ -36,7 +36,15 @@
 		onJoinError?: (error: unknown) => void;
 	}
 
-	let { roomId, userInfo, adapter, theme, UIOptions, viewOnly, onJoinError }: Props = $props();
+	let {
+		roomId,
+		userInfo,
+		adapter,
+		theme,
+		UIOptions,
+		viewOnly,
+		onJoinError,
+	}: Props = $props();
 
 	const session = createMultiplayerSessionState();
 	let excalidrawAPI = $state<ExcalidrawImperativeAPI | undefined>(undefined);
@@ -45,6 +53,7 @@
 	let connectionCleanup: (() => void) | null = null;
 	let syncPipeline: ReturnType<typeof createSyncPipeline> | null = null;
 	let roomClosed = $state(false);
+	let lastHandledFileIdsKey = "";
 
 	onMount(() => {
 		if (!browser || !roomId) return;
@@ -64,11 +73,16 @@
 					connectionCleanup = cleanup;
 				},
 				onInitialData(doc) {
-					lastBroadcastedSceneVersion = hashElementsVersion(doc.elements ?? []);
+					lastBroadcastedSceneVersion = hashElementsVersion(
+						doc.elements ?? [],
+					);
 					session.resolveInitialData(doc);
 				},
 				onCollaboratorEvent(ev) {
-					const next = applyCollaboratorEvent(session.collaborators, ev);
+					const next = applyCollaboratorEvent(
+						session.collaborators,
+						ev,
+					);
 					if (next !== session.collaborators) {
 						session.collaborators = next;
 						excalidrawAPI?.updateScene({ collaborators: next });
@@ -80,10 +94,15 @@
 					const local = api.getSceneElementsIncludingDeleted();
 					const appState = api.getAppState();
 					const restored = restoreElements(elements, null);
-					const reconciled = reconcileElements(local, restored, appState);
+					const reconciled = reconcileElements(
+						local,
+						restored,
+						appState,
+					);
 					// Mark this version so the next onChange (from updateScene) won't re-push it.
 					// Use = not max: we only avoid echoing this exact state; next local edit has different hash.
-					lastBroadcastedSceneVersion = hashElementsVersion(reconciled);
+					lastBroadcastedSceneVersion =
+						hashElementsVersion(reconciled);
 					api.updateScene({ elements: reconciled });
 				},
 				onFiles(files) {
@@ -99,7 +118,10 @@
 					if (!api) return;
 					const appState = api.getAppState();
 					api.updateScene({
-						appState: { ...appState, followedBy: new Set(followedBy) },
+						appState: {
+							...appState,
+							followedBy: new Set(followedBy),
+						},
 					});
 				},
 				onViewport(userId, sceneBounds) {
@@ -141,7 +163,10 @@
 		});
 		if (key === lastUserInfoKey) return;
 		lastUserInfoKey = key;
-		adapter.push(roomId, conn.userId, { type: "userInfo", userInfo: nextInfo });
+		adapter.push(roomId, conn.userId, {
+			type: "userInfo",
+			userInfo: nextInfo,
+		});
 		const next = new Map(session.collaborators);
 		const existing =
 			next.get(conn.userId) ??
@@ -158,8 +183,21 @@
 
 	// Push collaborators into Excalidraw’s scene so cursors/labels stay in sync.
 	$effect(() => {
-		if (!excalidrawAPI || !session.collaborators) return;
-		excalidrawAPI.updateScene({ collaborators: session.collaborators });
+		if (!excalidrawAPI || !session.connection) return;
+		const conn = session.connection;
+		const collaborators = session.collaborators;
+		const existing =
+			collaborators.get(conn.userId) ??
+			({ id: conn.userId, socketId: conn.userId } as Collaborator);
+		const withUserInfo = new Map(collaborators);
+		withUserInfo.set(conn.userId, {
+			...existing,
+			username: userInfo.username,
+			...(userInfo.color && { color: userInfo.color }),
+			...(userInfo.avatarUrl && { avatarUrl: userInfo.avatarUrl }),
+			isCurrentUser: true,
+		});
+		excalidrawAPI.updateScene({ collaborators: withUserInfo });
 	});
 
 	// Forward follow/unfollow from Excalidraw to the adapter so the backend can broadcast follow state.
@@ -174,7 +212,10 @@
 			}) => {
 				adapter.push(roomId, conn.userId, {
 					type: "followState",
-					followingUserId: payload.action === "FOLLOW" ? payload.userToFollow?.socketId ?? null : null,
+					followingUserId:
+						payload.action === "FOLLOW"
+							? (payload.userToFollow?.socketId ?? null)
+							: null,
 				});
 			},
 		);
@@ -187,45 +228,55 @@
 		<p>Host left. The room is closed.</p>
 	</div>
 {:else}
-<Excalidraw
-	bind:excalidrawAPI
-	initialData={session.initialData}
-	isCollaborating={true}
-	viewModeEnabled={viewOnly ?? false}
-	{theme}
-	{UIOptions}
-	onChange={(elements, _appState, files) => {
-		if (viewOnly) return;
-		const sceneVersion = hashElementsVersion(elements);
-		// Skip only if we already pushed this exact version (avoid duplicate push).
-		if (sceneVersion === lastBroadcastedSceneVersion) return;
-		lastBroadcastedSceneVersion = sceneVersion;
-		const conn = session.connection;
-		if (!conn || !syncPipeline) return;
-		syncPipeline.handleElementsChange(roomId, conn.userId, elements);
-		if (files) {
-			syncPipeline.handleFilesChange(roomId, conn.userId, files);
-		}
-	}}
-	onPointerUpdate={(update) => {
-		const conn = session.connection;
-		if (!conn || !syncPipeline) return;
-		syncPipeline.handlePointerUpdate(roomId, conn.userId, {
-			pointer: update.pointer,
-			button: update.button,
-			selectedElementIds: excalidrawAPI?.getAppState().selectedElementIds,
-		});
-	}}
-	onScrollChange={(_scrollX: number, _scrollY: number) => {
-		const conn = session.connection;
-		if (!conn || !excalidrawAPI || !syncPipeline) return;
-		const appState = excalidrawAPI.getAppState();
-		if (appState.userToFollow?.socketId) return;
-		if (appState.followedBy.size === 0) return;
-		const sceneBounds = getVisibleSceneBounds(appState);
-		syncPipeline.handleViewportChange(roomId, conn.userId, sceneBounds);
-	}}
-/>
+	<Excalidraw
+		bind:excalidrawAPI
+		initialData={session.initialData}
+		isCollaborating={true}
+		viewModeEnabled={viewOnly ?? false}
+		{theme}
+		{UIOptions}
+		onChange={(elements, _appState, files) => {
+			if (viewOnly) return;
+			const sceneVersion = hashElementsVersion(elements);
+			// Skip only if we already pushed this exact version (avoid duplicate push).
+			if (sceneVersion === lastBroadcastedSceneVersion) return;
+			lastBroadcastedSceneVersion = sceneVersion;
+			const conn = session.connection;
+			if (!conn || !syncPipeline) return;
+			syncPipeline.handleElementsChange(roomId, conn.userId, elements);
+			// Only push files when the set of file IDs has changed (new/removed files).
+			// Excalidraw always passes the full files object on every onChange, so we
+			// must compare keys to avoid pushing on element moves/edits.
+			if (files) {
+				const fileIdsKey = JSON.stringify(Object.keys(files).sort());
+				if (fileIdsKey !== lastHandledFileIdsKey) {
+					lastHandledFileIdsKey = fileIdsKey;
+					syncPipeline.handleFilesChange(roomId, conn.userId, files);
+				}
+			} else {
+				lastHandledFileIdsKey = "";
+			}
+		}}
+		onPointerUpdate={(update) => {
+			const conn = session.connection;
+			if (!conn || !syncPipeline) return;
+			syncPipeline.handlePointerUpdate(roomId, conn.userId, {
+				pointer: update.pointer,
+				button: update.button,
+				selectedElementIds:
+					excalidrawAPI?.getAppState().selectedElementIds,
+			});
+		}}
+		onScrollChange={(_scrollX: number, _scrollY: number) => {
+			const conn = session.connection;
+			if (!conn || !excalidrawAPI || !syncPipeline) return;
+			const appState = excalidrawAPI.getAppState();
+			if (appState.userToFollow?.socketId) return;
+			if (appState.followedBy.size === 0) return;
+			const sceneBounds = getVisibleSceneBounds(appState);
+			syncPipeline.handleViewportChange(roomId, conn.userId, sceneBounds);
+		}}
+	/>
 {/if}
 
 <style>

@@ -18,6 +18,7 @@
 		renameWhiteboardFile,
 		slugifyCollectionName,
 		type LocalCollection,
+		type LocalWhiteboardMeta,
 	} from "$lib/client/fs-storage.js";
 	import { formatDateAgo } from "$lib/core/date-format.js";
 	import { whiteboardLocalUrl, whiteboardRemoteUrl } from "$lib/core/whiteboard-url.js";
@@ -34,7 +35,7 @@
 
 	let localWorkspace = $state<{ workspaceId: string; dirHandle: FileSystemDirectoryHandle } | null>(null);
 	let localCollection = $state<LocalCollection | null>(null);
-	let whiteboards = $state<{ base: string; lastModified: number }[]>([]);
+	let whiteboards = $state<LocalWhiteboardMeta[]>([]);
 	let loading = $state(true);
 	let showNewForm = $state(false);
 	let newName = $state("");
@@ -124,7 +125,7 @@
 		newName = "";
 		const subdir = await localWorkspace.dirHandle.getDirectoryHandle(localCollection.dirName);
 		await writeSceneToFile(subdir, base, { elements: [], files: {} });
-		whiteboards = [...whiteboards, { base, lastModified: Date.now() }].sort((a, b) => a.base.localeCompare(b.base));
+		whiteboards = await listWhiteboardsInCollection(localWorkspace.dirHandle, localCollection.dirName);
 		openWhiteboard(base, `${collectionParam}/${base}`);
 	}
 
@@ -186,7 +187,7 @@
 		const subdir = await localWorkspace.dirHandle.getDirectoryHandle(localCollection.dirName);
 		await renameWhiteboardFile(subdir, oldId, newBase);
 		whiteboards = whiteboards
-			.map((w) => (w.base === oldId ? { base: newBase, lastModified: w.lastModified } : w))
+			.map((w) => (w.base === oldId ? { ...w, base: newBase } : w))
 			.sort((a, b) => a.base.localeCompare(b.base));
 		hideRenameWhiteboard(sid);
 	}
@@ -246,7 +247,8 @@
 				<p class="empty">No whiteboards in this collection. Create one above.</p>
 			{:else}
 				<div class="preview-list preview-list-grid">
-					{#each whiteboards as { base, lastModified }}
+					{#each whiteboards as wb}
+						{@const base = wb.base}
 						{@const sid = anchorId(base)}
 						{@const wbRenameSid = "wb-" + sid}
 						{@const segment = `${collectionParam}/${base}`}
@@ -260,8 +262,9 @@
 							<PreviewCard
 								variant="whiteboard"
 								mode="workspace"
-								name={base}
-								updatedAt={lastModified || null}
+								name={wb.name ?? base}
+								createdAt={wb.createdAt}
+								updatedAt={wb.updatedAt}
 								formatDateAgo={formatDateAgo}
 								onclick={() => openWhiteboard(base, segment)}
 								sid={sid}

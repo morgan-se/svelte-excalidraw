@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { generateRoomCode } from "$lib/core/room-code.js";
 import { getConfig } from "$lib/server/config.js";
 import { WORKSPACES_DIR } from "./data-dir.js";
+import { createInitialSceneJson } from "$lib/core/scene-meta.js";
 import { getDb } from "./db.js";
 import { deleteWhiteboard, upsertWhiteboard } from "./room-meta-db.js";
 
@@ -131,8 +132,6 @@ export function getWorkspaceWhiteboards(workspaceId: string): string[] {
 	return [...fromDirs];
 }
 
-const EMPTY_SCENE = JSON.stringify({ elements: [], files: {} });
-
 export function addWhiteboardToWorkspace(
 	workspaceId: string,
 	whiteboardId: string,
@@ -143,13 +142,13 @@ export function addWhiteboardToWorkspace(
 	const dir = join(WORKSPACES_DIR, safe);
 	mkdirSync(dir, { recursive: true });
 	const whiteboardDir = join(dir, whiteboardId);
+	const roomId = `${workspaceId}/${whiteboardId}`;
+	const now = Date.now();
 	if (!existsSync(whiteboardDir)) {
 		if (getWorkspaceWhiteboards(workspaceId).length >= getMaxWhiteboards()) return false;
 		mkdirSync(whiteboardDir, { recursive: true });
-		writeFileSync(join(whiteboardDir, SCENE_FILE), EMPTY_SCENE);
+		writeFileSync(join(whiteboardDir, SCENE_FILE), createInitialSceneJson(now));
 	}
-	const roomId = `${workspaceId}/${whiteboardId}`;
-	const now = Date.now();
 	upsertWhiteboard(roomId, {
 		createdAt: now,
 		lastUpdatedAt: now,

@@ -7,7 +7,7 @@
 	import { saveLocalDirToIndexedDB } from "$lib/client/local/local-dir-persistence.js";
 	import { pickDirectory, isFsAccessSupported } from "$lib/client/fs-storage.js";
 	import {
-		listExcalidrawFilesWithDates,
+		listExcalidrawFilesWithMeta,
 		readSceneFromFile,
 		writeSceneToFile,
 		deleteExcalidrawFile,
@@ -21,6 +21,7 @@
 		renameWhiteboardFile,
 		slugifyCollectionName,
 		type LocalCollection,
+		type LocalWhiteboardMeta,
 	} from "$lib/client/fs-storage.js";
 	import { formatDateAgo } from "$lib/core/date-format.js";
 	import { whiteboardLocalUrl, whiteboardRemoteUrl } from "$lib/core/whiteboard-url.js";
@@ -33,7 +34,7 @@
 	import { showPopover } from "$lib/client/components/popover-utils.js";
 
 	let localWorkspace = $state<{ workspaceId: string; dirHandle: FileSystemDirectoryHandle } | null>(null);
-	let whiteboards = $state<{ base: string; lastModified: number }[]>([]);
+	let whiteboards = $state<LocalWhiteboardMeta[]>([]);
 	let collections = $state<LocalCollection[]>([]);
 	let loading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -56,9 +57,7 @@
 		loading = true;
 		loadError = null;
 		try {
-			const { ensureLocalDbInFolder } = await import("$lib/client/local/local-db.js");
-			await ensureLocalDbInFolder(ws.dirHandle);
-			whiteboards = await listExcalidrawFilesWithDates(ws.dirHandle);
+			whiteboards = await listExcalidrawFilesWithMeta(ws.dirHandle);
 			collections = await listCollectionsFromDir(ws.dirHandle);
 		} catch (e) {
 			loadError = e instanceof Error ? e.message : String(e);
@@ -159,7 +158,7 @@
 		if (c) {
 			await deleteCollectionDir(localWorkspace.dirHandle, c.dirName);
 			collections = await listCollectionsFromDir(localWorkspace.dirHandle);
-			whiteboards = await listExcalidrawFilesWithDates(localWorkspace.dirHandle);
+			whiteboards = await listExcalidrawFilesWithMeta(localWorkspace.dirHandle);
 		}
 	}
 
@@ -169,7 +168,7 @@
 		showNewForm = false;
 		newName = "";
 		await writeSceneToFile(localWorkspace.dirHandle, base, { elements: [], files: {} });
-		whiteboards = [...whiteboards, { base, lastModified: Date.now() }].sort((a, b) => a.base.localeCompare(b.base));
+		whiteboards = await listExcalidrawFilesWithMeta(localWorkspace.dirHandle);
 		openWhiteboard(base);
 	}
 
@@ -222,7 +221,7 @@
 		if (!localWorkspace) return;
 		await renameWhiteboardFile(localWorkspace.dirHandle, oldId, newBase);
 		whiteboards = whiteboards
-			.map((w) => (w.base === oldId ? { base: newBase, lastModified: w.lastModified } : w))
+			.map((w) => (w.base === oldId ? { ...w, base: newBase } : w))
 			.sort((a, b) => a.base.localeCompare(b.base));
 		collections = await listCollectionsFromDir(localWorkspace.dirHandle);
 		hideRenameWhiteboard(sid);
@@ -234,8 +233,6 @@
 		const id = `remote-${generateRoomCode()}`;
 		setLocalWorkspace(id, dir);
 		await saveLocalDirToIndexedDB(id, dir);
-		const { ensureLocalDbInFolder } = await import("$lib/client/local/local-db.js");
-		await ensureLocalDbInFolder(dir);
 	}
 </script>
 
@@ -254,7 +251,7 @@
 	{:else if loadError}
 		<div class="load-error">
 			<p class="load-error-msg">Error loading workspace: {loadError}</p>
-			<p class="load-error-hint">Try clearing the stored folder and opening it again, or delete <code>db.sqlite</code> in your folder if it exists.</p>
+			<p class="load-error-hint">Try clearing the stored folder and opening it again.</p>
 			<div class="load-error-actions">
 				<button type="button" class="secondary" onclick={() => { loadError = null; loadList(); }}>Retry</button>
 				<button type="button" class="secondary" onclick={async () => { const { clearLocalDirFromIndexedDB } = await import("$lib/client/local/local-dir-persistence.js"); const { clearLocalWorkspace } = await import("$lib/client/local/local-workspace.js"); await clearLocalDirFromIndexedDB(); clearLocalWorkspace(); goto("/"); }}>Clear and reopen folder</button>
@@ -367,7 +364,8 @@
 					<p class="empty">All whiteboards are in collections.</p>
 				{:else}
 					<div class="preview-list preview-list-grid">
-						{#each whiteboards as { base, lastModified }}
+						{#each whiteboards as wb}
+							{@const base = wb.base}
 							{@const sid = anchorId(base)}
 							{@const wbRenameSid = "wb-" + sid}
 							{#snippet wbActions()}
@@ -384,8 +382,9 @@
 								<PreviewCard
 									variant="whiteboard"
 									mode="workspace"
-									name={base}
-									updatedAt={lastModified || null}
+									name={wb.name ?? base}
+									createdAt={wb.createdAt}
+									updatedAt={wb.updatedAt}
 									formatDateAgo={formatDateAgo}
 									onclick={() => openWhiteboard(base)}
 									sid={sid}
@@ -468,11 +467,6 @@
 		display: flex;
 		gap: 0.5rem;
 		flex-wrap: wrap;
-	}
-	.load-error code {
-		background: var(--border);
-		padding: 0.1rem 0.3rem;
-		border-radius: 4px;
 	}
 	.pick-folder {
 		display: flex;

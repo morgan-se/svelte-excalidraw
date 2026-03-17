@@ -3,7 +3,11 @@
  * Used for "Open folder" (local workspace) host: read on load, write back on updates.
  *
  * Collections = subdirectories. Slug is the dir name. No .svex-collections.json.
+ * svexMeta (createdAt, updatedAt, etc.) is embedded in each file; written first in JSON so listing can peek.
  */
+
+import { getSvexMeta, ensureSvexMetaForSave, SVEX_META_KEY } from "$lib/core/scene-meta.js";
+import type { SvexSceneMeta } from "$lib/core/types/workspace-types.js";
 
 export const SCENE_FILENAME = "scene.excalidraw";
 
@@ -11,6 +15,15 @@ export type ExcalidrawDoc = {
 	elements?: readonly Record<string, unknown>[];
 	files?: Record<string, unknown>;
 	[key: string]: unknown;
+};
+
+/** Whiteboard list item with embedded meta (1:1 with backend shape: id, name, createdAt, lastUpdatedAt). */
+export type LocalWhiteboardMeta = {
+	base: string;
+	createdAt: number;
+	updatedAt: number;
+	name?: string;
+	description?: string;
 };
 
 /** Normalize raw .excalidraw JSON (export format has type, version, appState, elements, files) to our shape. */
@@ -34,20 +47,24 @@ export function isFsAccessSupported(): boolean {
 	return typeof window !== "undefined" && "showDirectoryPicker" in window;
 }
 
+type HandleWithPermission = FileSystemHandle & {
+	queryPermission?(opts: { mode: string }): Promise<string>;
+	requestPermission?(opts: { mode: string }): Promise<string>;
+};
+
 /** Request readwrite permission before writing. Needed on Android/SAF where handles can be read-only. */
 export async function ensureReadWrite(handle: FileSystemFileHandle): Promise<void> {
-	const req = (handle as FileSystemFileHandle & { requestPermission?(opts: { mode: string }): Promise<string> })
-		.requestPermission;
-	if (typeof req !== "function") return;
+	// Handles restored from IndexedDB lose method binding; call via prototype to avoid Illegal invocation.
+	const proto = FileSystemHandle.prototype as unknown as HandleWithPermission;
+	const queryPermission = proto.queryPermission;
+	const requestPermission = proto.requestPermission;
+	if (typeof queryPermission !== "function") return;
 
-	const query = (handle as FileSystemFileHandle & { queryPermission?(opts: { mode: string }): Promise<string> })
-		.queryPermission;
-	if (typeof query === "function") {
-		const q = await query({ mode: "readwrite" });
-		if (q === "granted") return;
-	}
+	const q = await queryPermission.call(handle, { mode: "readwrite" });
+	if (q === "granted") return;
 
-	const r = await req({ mode: "readwrite" });
+	if (typeof requestPermission !== "function") return;
+	const r = await requestPermission.call(handle, { mode: "readwrite" });
 	if (r !== "granted") throw new Error("No write permission for this file handle");
 }
 
@@ -77,23 +94,60 @@ export async function listExcalidrawFiles(dir: FileSystemDirectoryHandle): Promi
 	return names.sort();
 }
 
-/** List .excalidraw files with lastModified (ms). Creation time not available from API. */
-export async function listExcalidrawFilesWithDates(
+const PEEK_BYTES = 8192;
+
+/** Peek svexMeta from start of file (we write svexMeta first in JSON). */
+async function readSvexMetaFromFile(
 	dir: FileSystemDirectoryHandle,
-): Promise<{ base: string; lastModified: number }[]> {
-	const result: { base: string; lastModified: number }[] = [];
+	filenameBase: string,
+): Promise<SvexSceneMeta | null> {
+	const filename = filenameBase.endsWith(EXCALIDRAW_EXT) ? filenameBase : filenameBase + EXCALIDRAW_EXT;
+	try {
+		const fileHandle = await dir.getFileHandle(filename);
+		const file = await fileHandle.getFile();
+		const blob = file.size <= PEEK_BYTES ? file : file.slice(0, PEEK_BYTES);
+		const text = await blob.text();
+		const doc = JSON.parse(text) as ExcalidrawDoc;
+		return getSvexMeta(doc);
+	} catch {
+		return null;
+	}
+}
+
+/** List .excalidraw files with embedded meta (createdAt, updatedAt, name, description). Peek each file for svexMeta; fallback to lastModified. */
+export async function listExcalidrawFilesWithMeta(
+	dir: FileSystemDirectoryHandle,
+): Promise<LocalWhiteboardMeta[]> {
+	const result: LocalWhiteboardMeta[] = [];
 	for await (const [name] of dir.entries()) {
 		if (!name.endsWith(EXCALIDRAW_EXT)) continue;
 		const base = name.slice(0, -EXCALIDRAW_EXT.length);
+		let lastModified = 0;
 		try {
 			const fileHandle = await dir.getFileHandle(name);
 			const file = await fileHandle.getFile();
-			result.push({ base, lastModified: file.lastModified });
-		} catch {
-			result.push({ base, lastModified: 0 });
-		}
+			lastModified = file.lastModified;
+		} catch {}
+		const meta = await readSvexMetaFromFile(dir, base);
+		const updatedAt = meta?.updatedAt ?? lastModified;
+		const createdAt = meta?.createdAt ?? updatedAt;
+		result.push({
+			base,
+			createdAt,
+			updatedAt,
+			...(meta?.name != null && meta.name !== "" && { name: meta.name }),
+			...(meta?.description != null && meta.description !== "" && { description: meta.description }),
+		});
 	}
 	return result.sort((a, b) => a.base.localeCompare(b.base));
+}
+
+/** @deprecated Use listExcalidrawFilesWithMeta. Kept for compatibility. */
+export async function listExcalidrawFilesWithDates(
+	dir: FileSystemDirectoryHandle,
+): Promise<{ base: string; lastModified: number }[]> {
+	const list = await listExcalidrawFilesWithMeta(dir);
+	return list.map((w) => ({ base: w.base, lastModified: w.updatedAt }));
 }
 
 /** Delete an .excalidraw file from the directory. filename = base name without .excalidraw. */
@@ -122,17 +176,25 @@ export async function readSceneFromFile(
 	}
 }
 
-/** Write scene to a file in the directory. */
+/** Write scene to a file in the directory. Ensures svexMeta is set and written first in JSON for listing peek. */
 export async function writeSceneToFile(
 	dir: FileSystemDirectoryHandle,
 	filenameBase: string,
 	doc: ExcalidrawDoc,
 ): Promise<void> {
+	const now = Date.now();
+	ensureSvexMetaForSave(doc as Record<string, unknown>, now);
+	// Serialize with svexMeta first so listExcalidrawFilesWithMeta can peek
+	const d = doc as Record<string, unknown>;
+	const ordered =
+		typeof d[SVEX_META_KEY] !== "undefined"
+			? { [SVEX_META_KEY]: d[SVEX_META_KEY], ...Object.fromEntries(Object.entries(d).filter(([k]) => k !== SVEX_META_KEY)) }
+			: doc;
 	const filename = filenameBase.endsWith(EXCALIDRAW_EXT) ? filenameBase : filenameBase + EXCALIDRAW_EXT;
 	const fileHandle = await dir.getFileHandle(filename, { create: true });
 	await ensureReadWrite(fileHandle as FileSystemFileHandle);
 	const writable = await (fileHandle as FileSystemFileHandle).createWritable();
-	await writable.write(JSON.stringify(doc, null, 2));
+	await writable.write(JSON.stringify(ordered, null, 2));
 	await writable.close();
 }
 
@@ -173,7 +235,7 @@ export async function listCollectionsFromDir(
 		const collection = slugifyDirName(name);
 		if (!collection) continue;
 		const subdir = await rootDir.getDirectoryHandle(name);
-		const files = await listExcalidrawFilesWithDates(subdir);
+		const files = await listExcalidrawFilesWithMeta(subdir);
 		result.push({
 			collection,
 			dirName: name,
@@ -183,13 +245,13 @@ export async function listCollectionsFromDir(
 	return result.sort((a, b) => a.collection.localeCompare(b.collection));
 }
 
-/** List whiteboards in a collection subdir with lastModified. */
+/** List whiteboards in a collection subdir with meta (createdAt, updatedAt, name, description). */
 export async function listWhiteboardsInCollection(
 	rootDir: FileSystemDirectoryHandle,
 	dirName: string,
-): Promise<{ base: string; lastModified: number }[]> {
+): Promise<LocalWhiteboardMeta[]> {
 	const subdir = await rootDir.getDirectoryHandle(dirName);
-	return listExcalidrawFilesWithDates(subdir);
+	return listExcalidrawFilesWithMeta(subdir);
 }
 
 export function slugifyCollectionName(name: string): string {

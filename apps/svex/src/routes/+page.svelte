@@ -5,7 +5,7 @@
 	import {
 		pickDirectory,
 		isFsAccessSupported,
-		listExcalidrawFilesWithDates,
+		listExcalidrawFilesWithMeta,
 		listCollectionsFromDir,
 		readSceneFromFile,
 		normalizeExcalidrawDoc,
@@ -122,7 +122,7 @@
 		(async () => {
 			try {
 				const [whiteboards, collections] = await Promise.all([
-					listExcalidrawFilesWithDates(ws.dirHandle),
+					listExcalidrawFilesWithMeta(ws.dirHandle),
 					listCollectionsFromDir(ws.dirHandle),
 				]);
 				if (cancelled) return;
@@ -367,7 +367,7 @@
 				</div>
 				{#if flags.workspaceSelfHostedHint}
 					<p class="block-desc">
-						<a href="https://svelte-excalidraw.tips.dev/svex/self-hosted" target="_blank" rel="noopener noreferrer">Self-host SVEX</a> to get your own persistent workspaces. If you'd rather not self-host, we recommend official Excalidraw workspaces at <a href="https://plus.excalidraw.com" target="_blank" rel="noopener noreferrer">plus.excalidraw.com</a>.
+						<a href="https://svelte-excalidraw.tips.dev/svex/self-hosted" target="_blank" rel="noopener noreferrer">Self-host SVEX</a> to get your own persistent workspaces.<br />If you'd rather not self-host, we recommend official Excalidraw workspaces at <a href="https://plus.excalidraw.com" target="_blank" rel="noopener noreferrer">plus.excalidraw.com</a>.
 					</p>
 				{:else}
 					<p class="block-desc">

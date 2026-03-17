@@ -190,7 +190,7 @@
 		{:else}
 			<div class="preview-list preview-list-grid">
 				{#each whiteboards as whiteboard}
-				{@const { id, name, lastUpdatedAt } = whiteboard}
+				{@const { id, name, createdAt, lastUpdatedAt } = whiteboard}
 					{@const sid = anchorId(id)}
 					{@const wbRenameSid = "wb-" + sid}
 					{@const segment = `${collectionParam}/${id}`}
@@ -204,6 +204,7 @@
 							variant="whiteboard"
 							mode="workspace"
 							name={whiteboard.name ?? id}
+							createdAt={createdAt}
 							updatedAt={lastUpdatedAt}
 							formatDateAgo={formatDateAgo}
 							onclick={() => openWhiteboard(id, segment)}

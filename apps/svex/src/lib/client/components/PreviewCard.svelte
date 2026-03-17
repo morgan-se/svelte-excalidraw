@@ -15,6 +15,7 @@
 		remainingHours = undefined,
 		access = "readWrite",
 		formatRemaining = undefined,
+		createdAt = undefined,
 		updatedAt = undefined,
 		formatDateAgo = undefined,
 		ephemeralBadge = undefined,
@@ -32,6 +33,7 @@
 		remainingHours?: number | null;
 		access?: "read" | "readWrite";
 		formatRemaining?: (hours: number | null) => string;
+		createdAt?: number | null;
 		updatedAt?: number | null;
 		formatDateAgo?: (date: number | null) => string;
 		/** When variant is ephemeral: show "Created" or "Joined" badge */
@@ -64,8 +66,17 @@
 			<span class="preview-card-name">{name}</span>
 			{#if variant === "collection" && count != null}
 				<span class="preview-card-meta">{count} whiteboard{count === 1 ? "" : "s"}</span>
-			{:else if variant === "whiteboard" && formatDateAgo && updatedAt !== undefined}
-				<span class="preview-card-meta">Updated {formatDateAgo(updatedAt)}</span>
+			{:else if variant === "whiteboard" && formatDateAgo && (createdAt !== undefined || updatedAt !== undefined)}
+				<span class="preview-card-meta">
+					{#if createdAt !== undefined && createdAt != null}
+						Created {formatDateAgo(createdAt)}
+						{#if updatedAt !== undefined && updatedAt != null && updatedAt !== createdAt}
+							 · Updated {formatDateAgo(updatedAt)}
+						{/if}
+					{:else if updatedAt !== undefined}
+						Updated {formatDateAgo(updatedAt)}
+					{/if}
+				</span>
 			{:else if variant === "ephemeral"}
 				<div class="preview-card-meta-row">
 					{#if ephemeralBadge}
@@ -101,6 +112,17 @@
 			<span class="preview-card-name">{name}</span>
 			{#if variant === "collection" && count != null}
 				<span class="preview-card-meta">{count} whiteboard{count === 1 ? "" : "s"}</span>
+			{:else if variant === "whiteboard" && formatDateAgo && (createdAt !== undefined || updatedAt !== undefined)}
+				<span class="preview-card-meta">
+					{#if createdAt !== undefined && createdAt != null}
+						Created {formatDateAgo(createdAt)}
+						{#if updatedAt !== undefined && updatedAt != null && updatedAt !== createdAt}
+							 · Updated {formatDateAgo(updatedAt)}
+						{/if}
+					{:else if updatedAt !== undefined}
+						Updated {formatDateAgo(updatedAt)}
+					{/if}
+				</span>
 			{:else if variant === "ephemeral"}
 				<div class="preview-card-meta-row">
 					{#if ephemeralBadge}
@@ -136,8 +158,17 @@
 			<span class="preview-card-name">{name}</span>
 			{#if variant === "collection" && count != null}
 				<span class="preview-card-meta">{count} whiteboard{count === 1 ? "" : "s"}</span>
-			{:else if variant === "whiteboard" && formatDateAgo && updatedAt !== undefined}
-				<span class="preview-card-meta">Updated {formatDateAgo(updatedAt)}</span>
+			{:else if variant === "whiteboard" && formatDateAgo && (createdAt !== undefined || updatedAt !== undefined)}
+				<span class="preview-card-meta">
+					{#if createdAt !== undefined && createdAt != null}
+						Created {formatDateAgo(createdAt)}
+						{#if updatedAt !== undefined && updatedAt != null && updatedAt !== createdAt}
+							 · Updated {formatDateAgo(updatedAt)}
+						{/if}
+					{:else if updatedAt !== undefined}
+						Updated {formatDateAgo(updatedAt)}
+					{/if}
+				</span>
 			{:else if variant === "ephemeral"}
 				<div class="preview-card-meta-row">
 					{#if ephemeralBadge}

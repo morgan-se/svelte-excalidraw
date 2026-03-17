@@ -39,7 +39,7 @@ Room IDs map to paths as follows:
 
 ### Local (folder) whiteboards
 
-Data flows through the server for real-time collaboration (SSE, etc.) but is **never stored** on the server. Persistence is only on the user's machine. On the **local filesystem**, the user picks a folder; each whiteboard is a file there: `<name>.excalidraw` (Excalidraw JSON). Example: `my-folder/scene.excalidraw`, `my-folder/board1.excalidraw`.
+Data flows through the server for real-time collaboration (SSE, etc.) but is **never stored** on the server. Persistence is only on the user's machine. On the **local filesystem**, the user picks a folder; each whiteboard is a file there: `<name>.excalidraw` (Excalidraw JSON). Collections are subdirectories. No SQLite or index files—the directory structure is the source of truth. Example: `my-folder/scene.excalidraw`, `my-folder/board1.excalidraw`, `my-folder/meeting-notes/dash.excalidraw`.
 
 ---
 

@@ -5,8 +5,10 @@
 	import { createSvexAdapter } from "$lib/client/svex-adapter.js";
 	import { writeSceneToFile, type ExcalidrawDoc } from "$lib/client/fs-storage.js";
 	import { getLocalHostSession } from "$lib/client/local/local-host-session.js";
-	import { getLocalWorkspace } from "$lib/client/local/local-workspace.js";
+	import { localWorkspaceStore, setLocalWorkspace } from "$lib/client/local/local-workspace.js";
 	import { toInternalRoomIdLocal } from "$lib/client/local/local-room-id.js";
+	import { loadLocalDirFromIndexedDB } from "$lib/client/local/local-dir-persistence.js";
+	import { verifyDirHandle } from "$lib/client/local/local-dir-persistence.js";
 	import { profileStore } from "$lib/client/client-state.js";
 	import { getRoomScene, createShareLink } from "$lib/svex.remote.js";
 	import { COLLABORATOR_COLORS } from "$lib/core/collaborator-colors.js";
@@ -20,7 +22,24 @@
 		return (collection && roomId ? `${collection}/${roomId}` : roomId) ?? "";
 	});
 
-	const ws = $derived(browser ? getLocalWorkspace() : null);
+	const ws = $derived(browser ? $localWorkspaceStore : null);
+
+	// When returning from AFK, in-memory workspace can be gone but handle may still be in IndexedDB.
+	// Try to restore so we don't show "No local workspace" without giving the user a chance to re-grant.
+	$effect(() => {
+		if (!browser || ws) return;
+		let cancelled = false;
+		(async () => {
+			const stored = await loadLocalDirFromIndexedDB();
+			if (cancelled || !stored) return;
+			if (await verifyDirHandle(stored.handle)) {
+				if (!cancelled) setLocalWorkspace(stored.workspaceId, stored.handle);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
 	const internalRoomId = $derived.by(() => {
 		if (!ws) return "";
 		return toInternalRoomIdLocal(ws.workspaceId, segmentId);
