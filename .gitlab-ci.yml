@@ -15,6 +15,11 @@ variables:
   STACK_COMPOSE_SERVICES: "svex docs"
   INFRA_SRC: "docker/prod"
 
+# tips-framework shell runners: node/npm live under nvm (not default PATH) — same as .fmw-build-docker-login
+.shell-nvm:
+  before_script:
+    - . $HOME/.nvm/nvm.sh
+
 # cd STACK_DIR, login registry, compose pull/up all services (image vars from .env.deploy only)
 .prod-compose-up:
   tags:
@@ -37,8 +42,9 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — jobs use the runner host's node/npm (need a recent Node + npm).
+# Shell executor ignores `image:` — use runner host Node via nvm (see .shell-nvm).
 build:
+  extends: .shell-nvm
   stage: build
   image: node:24
   tags:
@@ -73,6 +79,7 @@ build:
 #   git tag v0.0.9 && git push origin v0.0.9
 # Requires NPM_TOKEN. Tag pipeline runs build + this job (no docker/deploy unless you add tag rules).
 publish-npm-release:
+  extends: .shell-nvm
   stage: publish
   image: node:24
   tags:
@@ -89,6 +96,7 @@ publish-npm-release:
 
 # dev → GitLab Package Registry (tag dev). Uses CI_JOB_TOKEN.
 publish-npm-dev:
+  extends: .shell-nvm
   stage: publish
   image: node:24
   tags:
