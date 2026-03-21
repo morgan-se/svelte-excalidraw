@@ -1,4 +1,4 @@
-# Single stack: svex + docs. Deployed to /docker/svex by CI (see README.md)
+# Single stack: svex + docs. CI syncs here from docker/prod/ (default path: STACK_PROD_DIR in .gitlab-ci.yml)
 name: svelte-excalidraw
 
 services:

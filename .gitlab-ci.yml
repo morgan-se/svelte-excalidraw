@@ -1,5 +1,5 @@
 # svelte-excalidraw: npm publish + GitLab images + PROD on prod1
-# Single compose: docker/prod/compose.yml → /docker/svex (see docker/prod/README.md)
+# Single compose: docker/prod/ → STACK_PROD_DIR (default under gitlab-runner $HOME; override in CI variables)
 #
 # Stages: deploy before publish — ship main first; tag/npm release when you’re ready.
 #
@@ -20,7 +20,8 @@ variables:
   NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.npm-cache"
   DOCS_IMAGE: $CI_REGISTRY_IMAGE/docs
   SVEX_IMAGE: $CI_REGISTRY_IMAGE/svex
-  STACK_PROD_DIR: "/docker/svex"
+  # Writable on shell runner without sudo (mkdir under $HOME). Override to e.g. /docker/svex if that path exists on runner0.
+  STACK_PROD_DIR: "/home/gitlab-runner/stack-deploy/svelte-excalidraw"
   STACK_COMPOSE_SERVICES: "svex docs"
   INFRA_SRC: "docker/prod"
 
@@ -186,6 +187,7 @@ build-docker-svex:
   script:
     - test -d "$CI_PROJECT_DIR/$INFRA_SRC" || (echo "Missing $INFRA_SRC" && exit 1)
     - test -f "$CI_PROJECT_DIR/$INFRA_SRC/compose.yml" || (echo "Missing $INFRA_SRC/compose.yml" && exit 1)
+    - mkdir -p "$STACK_PROD_DIR"
     - |
       if command -v rsync >/dev/null 2>&1; then
         rsync -av "$CI_PROJECT_DIR/$INFRA_SRC/" "$STACK_PROD_DIR/" \
