@@ -4,15 +4,33 @@
 import * as v from "valibot";
 import { query, command, getRequestEvent } from "$app/server";
 import { getRoomDocument } from "svelte-excalidraw/server/state";
-import { getOrCreateSessionId, updateSession } from "$lib/server/auth/session-cookie.js";
+import {
+	getOrCreateSessionId,
+	updateSession,
+	SESSION_COOKIE,
+	getSessionCookieOptions,
+} from "$lib/server/auth/session-cookie.js";
 import { updateSessionFingerprint } from "$lib/server/auth/session-storage.js";
 import { getOrCreateLoginToken } from "$lib/server/auth/login-token.js";
 import { createShareToken } from "$lib/server/auth/share-token.js";
-import { getSession, patchSession, mergeSession } from "$lib/server/auth/session-store.js";
+import {
+	getSession,
+	patchSession,
+	mergeSession,
+	setSession,
+	deleteSessionFromStore,
+} from "$lib/server/auth/session-store.js";
+import { deleteSessionFromDb, getSessionFingerprint } from "$lib/server/auth/session-storage.js";
 import {
 	createUpgradeCode as createUpgradeCodeStore,
 	consumeUpgradeCode,
 } from "$lib/server/auth/upgrade-code.js";
+import {
+	checkRateLimit,
+	getUpgradeLimit,
+	isRateLimitEnabledForSensitiveRoutes,
+} from "$lib/server/auth/rate-limit.js";
+import { logSecurityEvent } from "$lib/server/auth/security-events.js";
 import { loadRoom, deleteRoomFromDisk } from "$lib/server/storage/room-storage.js";
 import { refreshEphemeral } from "$lib/server/room-ttl.js";
 import {
@@ -77,12 +95,16 @@ export const getRemoteRoomScene = query(
 
 export const createWorkspace = command(v.string(), async (slug): Promise<{ workspaceId: string } | { error: string }> => {
 	const event = getRequestEvent();
-	if (!event) return { error: "No request context" };
+	if (!event) {
+		logSecurityEvent({ type: "command_failure", route: "createWorkspace", outcome: "failure" }, undefined);
+		return { error: "No request context" };
+	}
 	const config = getConfig();
 	const sid = getOrCreateSessionId(event.cookies);
 	const session = getSession(sid);
 	const userKind = session.userKind ?? "guest";
 	if (!canCreate(userKind, config.workspace.createAllowedFor)) {
+		logSecurityEvent({ type: "command_failure", route: "createWorkspace", outcome: "failure" }, undefined);
 		return { error: "Not allowed to create workspaces" };
 	}
 	try {
@@ -93,6 +115,7 @@ export const createWorkspace = command(v.string(), async (slug): Promise<{ works
 		});
 		return { workspaceId: wid };
 	} catch (err) {
+		logSecurityEvent({ type: "command_failure", route: "createWorkspace", outcome: "failure" }, undefined);
 		return { error: err instanceof Error ? err.message : "Failed to create workspace" };
 	}
 });
@@ -313,17 +336,54 @@ export const renameWhiteboard = command(
 	},
 );
 
-/** Upgrade session with one-time code. Returns ok or error. */
-export const upgradeWithCode = command(v.string(), async (code): Promise<{ ok: true } | { error: string }> => {
+const GENERIC_UPGRADE_ERROR = "Invalid or expired code";
+
+/** Upgrade session with one-time code. Returns ok or error. Generic message to avoid token-state disclosure. */
+export const upgradeWithCode = command(
+	v.string(),
+	async (code): Promise<{ ok: true; targetUserKind: "trusted" | "admin" } | { error: string }> => {
 		const event = getRequestEvent();
-		if (!event) return { error: "No request context" };
+		if (!event) return { error: GENERIC_UPGRADE_ERROR };
+
+		const clientAddress = typeof event.getClientAddress === "function" ? event.getClientAddress() : "unknown";
+		const sid = getOrCreateSessionId(event.cookies);
+		const fingerprint = getSessionFingerprint(sid) ?? "";
+		const rateLimitKey = `upgrade:${clientAddress}:${fingerprint}`;
+		if (isRateLimitEnabledForSensitiveRoutes()) {
+			const allowed = checkRateLimit(rateLimitKey, getUpgradeLimit());
+			if (!allowed) {
+				logSecurityEvent(
+					{ type: "upgrade_invalid", route: "upgrade", outcome: "rate_limited" },
+					clientAddress,
+				);
+				return { error: GENERIC_UPGRADE_ERROR };
+			}
+		}
 
 		const payload = consumeUpgradeCode(code.trim());
-		if (!payload) return { error: "Invalid or expired code" };
+		if (!payload) {
+			logSecurityEvent(
+				{ type: "upgrade_invalid", route: "upgrade", outcome: "failure" },
+				clientAddress,
+			);
+			return { error: GENERIC_UPGRADE_ERROR };
+		}
+		logSecurityEvent(
+			{ type: "upgrade_consumed", route: "upgrade", outcome: "success" },
+			clientAddress,
+		);
 
-		const sid = getOrCreateSessionId(event.cookies);
-		mergeSession(sid, { userKind: payload.targetUserKind });
-		return { ok: true };
+		const current = getSession(sid);
+		const newSid = crypto.randomUUID();
+		const newData = {
+			...current,
+			userKind: payload.targetUserKind,
+		};
+		setSession(newSid, newData);
+		deleteSessionFromDb(sid);
+		deleteSessionFromStore(sid);
+		event.cookies.set(SESSION_COOKIE, newSid, getSessionCookieOptions());
+		return { ok: true, targetUserKind: payload.targetUserKind };
 	},
 );
 
@@ -365,7 +425,10 @@ const createShareLinkSchema = v.object({
 /** Create a share link (read or readWrite). Returns URL and expiry. */
 export const createShareLink = command(createShareLinkSchema, async (payload): Promise<{ url: string; expiresAt: number } | { error: string }> => {
 		const event = getRequestEvent();
-		if (!event) return { error: "No request context" };
+		if (!event) {
+			logSecurityEvent({ type: "command_failure", route: "createShareLink", outcome: "failure" }, undefined);
+			return { error: "No request context" };
+		}
 		const kind =
 			payload.kind ?? (payload.workspaceId === "ephemeral" ? "ephemeral" : "workspace");
 		const workspaceId = kind === "workspace" || kind === "local" ? payload.workspaceId : undefined;
@@ -378,8 +441,14 @@ export const createShareLink = command(createShareLinkSchema, async (payload): P
 			});
 			const url = `${event.url.origin}/join/${token}`;
 			return { url, expiresAt };
-		} catch {
-			return { error: "Failed to create share link" };
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : "";
+			const error =
+				msg === "Share links are disabled for this workspace"
+					? msg
+					: "Failed to create share link";
+			logSecurityEvent({ type: "command_failure", route: "createShareLink", outcome: "failure" }, undefined);
+			return { error };
 		}
 	},
 );

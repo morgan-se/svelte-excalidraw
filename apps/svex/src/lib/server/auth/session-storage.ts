@@ -110,6 +110,23 @@ export function updateSessionFingerprint(sid: string, fingerprint: string): void
 	getDb().prepare("UPDATE sessions SET fingerprint = ? WHERE id = ?").run(fingerprint.trim(), safe);
 }
 
+/** Read fingerprint for rate-limit bucketing (IP + fingerprint). Returns null if not set. */
+export function getSessionFingerprint(sid: string): string | null {
+	const safe = sanitizeSid(sid);
+	if (!safe) return null;
+	const row = getDb().prepare("SELECT fingerprint FROM sessions WHERE id = ?").get(safe) as { fingerprint: string | null } | undefined;
+	return row?.fingerprint ?? null;
+}
+
+/** Delete one session and its grants from DB. Use after rotating to a new session id. */
+export function deleteSessionFromDb(sid: string): void {
+	const safe = sanitizeSid(sid);
+	if (!safe) return;
+	const db = getDb();
+	db.prepare("DELETE FROM session_grants WHERE session_id = ?").run(safe);
+	db.prepare("DELETE FROM sessions WHERE id = ?").run(safe);
+}
+
 /** List all session ids in DB (for debugging/admin). */
 export function listSessionIdsOnDisk(): string[] {
 	const rows = getDb().prepare("SELECT id FROM sessions").all() as { id: string }[];

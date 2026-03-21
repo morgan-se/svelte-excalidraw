@@ -8,6 +8,12 @@ node_modules
 /.svelte-kit
 /build
 
+# Runtime / ephemeral data (do not commit)
+/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
 # OS
 .DS_Store
 Thumbs.db

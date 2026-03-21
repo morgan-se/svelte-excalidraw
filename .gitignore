@@ -9,3 +9,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 tsconfig.tsbuildinfo
 data/
+
+# Generated and runtime data (do not commit)
+apps/docs/build/
+apps/svex/data/

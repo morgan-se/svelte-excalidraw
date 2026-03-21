@@ -9,11 +9,13 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"svex:admin": "node scripts/bootstrap-admin.mjs"
 	},
 	"dependencies": {
 		"@excalidraw/random-username": "^1.1.0",
 		"@fingerprintjs/fingerprintjs": "^4.5.0",
+		"argon2": "^0.44.0",
 		"better-sqlite3": "^11.10.0",
 		"svelte-excalidraw": "*",
 		"valibot": "^1.2.0"
@@ -23,7 +25,7 @@
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@types/node": "^25.2.3",
-		"svelte": "^5.49.2",
+		"svelte": "^5.50.2",
 		"svelte-check": "^4.3.6",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1"

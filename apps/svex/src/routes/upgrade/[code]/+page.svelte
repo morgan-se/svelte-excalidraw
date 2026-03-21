@@ -14,7 +14,11 @@
 		}
 		done = true;
 		upgradeWithCode(code).then((out) => {
-			window.location.href = "/";
+			if (out && "ok" in out && out.ok && out.targetUserKind === "admin") {
+				window.location.href = "/account/security";
+			} else {
+				window.location.href = "/";
+			}
 		});
 	});
 </script>

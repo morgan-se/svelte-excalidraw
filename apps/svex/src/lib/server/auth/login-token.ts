@@ -1,40 +1,38 @@
 /**
- * Server-only: login link = static token stored in session. Reusable.
+ * Server-only: login link token stored hashed (HMAC-SHA256 + pepper). Raw shown once.
  * Claiming the link: this device takes over the session; the other is logged out.
  */
 import { getDb } from "../storage/db.js";
 import { loadSessionFromDisk } from "./session-storage.js";
 import { deleteSessionFromStore } from "./session-store.js";
+import { hashToken } from "./token-utils.js";
 
 function sanitizeToken(token: string): string {
 	return /^[a-zA-Z0-9-]+$/.test(token) && token.length <= 64 ? token : "";
 }
 
-/** Get or create the static login token for this session. Never expires. */
+/** Create a new login token for this session (overwrites any previous). Returns raw token once; never log it. */
 export function getOrCreateLoginToken(sid: string): string {
 	const safe = /^[a-zA-Z0-9-]+$/.test(sid) && sid.length <= 64 ? sid : "";
 	if (!safe) return "";
-	const db = getDb();
-	const row = db.prepare("SELECT login_token FROM sessions WHERE id = ?").get(safe) as {
-		login_token: string | null;
-	} | undefined;
-	if (row?.login_token) return row.login_token;
-	const token = crypto.randomUUID();
-	db.prepare("UPDATE sessions SET login_token = ? WHERE id = ?").run(token, safe);
-	return token;
+	const rawToken = crypto.randomUUID();
+	const stored = hashToken(rawToken);
+	getDb().prepare("UPDATE sessions SET login_token = ? WHERE id = ?").run(stored, safe);
+	return rawToken;
 }
 
 /**
  * Claim session by token: this device takes over. Old session is deleted (other device logged out).
- * Returns new session id for the cookie, or null if token invalid.
+ * Returns new session id for the cookie, or null if token invalid. Lookup by hash only.
  */
 export function claimLoginToken(token: string): string | null {
 	const safe = sanitizeToken(token);
 	if (!safe) return null;
 	const db = getDb();
-	const row = db.prepare("SELECT id FROM sessions WHERE login_token = ?").get(safe) as {
-		id: string;
-	} | undefined;
+	const hashed = hashToken(safe);
+	const row = db.prepare("SELECT id FROM sessions WHERE login_token = ?").get(hashed) as
+		| { id: string }
+		| undefined;
 	if (!row) return null;
 	const oldSid = row.id;
 	const data = loadSessionFromDisk(oldSid);
@@ -51,7 +49,7 @@ export function claimLoginToken(token: string): string | null {
 		data.color ?? null,
 		data.createdAt ?? now,
 		data.lastPresenceAt ?? now,
-		safe,
+		hashed,
 	);
 	const grants = db.prepare("SELECT workspace_id, whiteboard_id, access FROM session_grants WHERE session_id = ?").all(
 		oldSid,

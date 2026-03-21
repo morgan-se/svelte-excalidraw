@@ -1,11 +1,12 @@
 /**
  * Server-only: share links for whiteboards. One-time use.
- * TTL: max 24h, or for ephemeral rooms: min(24h, remaining room liveness).
+ * Persist hashed tokens only (HMAC-SHA256 + pepper); raw token shown once.
  */
-import { getDb } from "../storage/db.js";
+import { getDb, isShareLinksDisabled } from "../storage/db.js";
 import { getConfig } from "../config.js";
 import { getWhiteboard } from "../storage/room-meta-db.js";
 import type { GrantAccess } from "$lib/core/types/session-types.js";
+import { hashToken } from "./token-utils.js";
 
 const MAX_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -34,28 +35,40 @@ export function createShareToken(payload: Omit<ShareTokenPayload, "expiresAt">):
 	token: string;
 	expiresAt: number;
 } {
-	const token = crypto.randomUUID();
+	if (
+		(payload.kind === "workspace" || payload.kind === "local") &&
+		payload.workspaceId &&
+		isShareLinksDisabled(payload.workspaceId)
+	) {
+		throw new Error("Share links are disabled for this workspace");
+	}
+	const rawToken = crypto.randomUUID();
+	const stored = hashToken(rawToken);
 	const expiresAt = computeExpiresAt(payload.kind, payload.roomId);
+	const now = Date.now();
 	getDb()
 		.prepare(
-			"INSERT INTO share_tokens (token, kind, workspace_id, room_id, access, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+			"INSERT INTO share_tokens (token, kind, workspace_id, room_id, access, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		)
 		.run(
-			token,
+			stored,
 			payload.kind,
 			payload.workspaceId ?? null,
 			payload.roomId,
 			payload.access,
 			expiresAt,
+			now,
 		);
-	return { token, expiresAt };
+	return { token: rawToken, expiresAt };
 }
 
-/** Consume token: return payload if valid and not expired; delete. One-time use. */
+/** Consume token: return payload if valid and not expired; delete. One-time use. Lookup by hash only. */
 export function consumeShareToken(token: string): ShareTokenPayload | null {
 	if (!/^[a-zA-Z0-9-]+$/.test(token) || token.length > 64) return null;
 	const db = getDb();
-	const row = db.prepare("SELECT * FROM share_tokens WHERE token = ?").get(token) as {
+	const hashed = hashToken(token);
+	const row = db.prepare("SELECT * FROM share_tokens WHERE token = ?").get(hashed) as {
+		token: string;
 		kind: string;
 		workspace_id: string | null;
 		room_id: string;
@@ -63,11 +76,11 @@ export function consumeShareToken(token: string): ShareTokenPayload | null {
 		expires_at: number;
 	} | undefined;
 	if (!row) return null;
-	db.prepare("DELETE FROM share_tokens WHERE token = ?").run(token);
 	if (row.expires_at < Date.now()) return null;
 	if (row.kind !== "workspace" && row.kind !== "ephemeral" && row.kind !== "local") return null;
 	if (row.access !== "read" && row.access !== "readWrite") return null;
 	if ((row.kind === "workspace" || row.kind === "local") && !row.workspace_id) return null;
+	db.prepare("DELETE FROM share_tokens WHERE token = ?").run(row.token);
 	return {
 		kind: row.kind as ShareTokenKind,
 		workspaceId: row.workspace_id ?? undefined,

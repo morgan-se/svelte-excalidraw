@@ -118,8 +118,9 @@
 		const urlMatch = raw.match(/\/upgrade\/([a-zA-Z0-9-]+)/);
 		const code = urlMatch ? urlMatch[1]! : raw.split(/[?#]/)[0]?.trim() ?? raw;
 		const out = await upgradeWithCode(code);
-		if (out && "ok" in out) window.location.href = "/";
-		else if (out && "error" in out) loginLinkError = out.error ?? "Failed";
+		if (out && "ok" in out && out.ok) {
+			window.location.href = out.targetUserKind === "admin" ? "/account/security" : "/";
+		} else if (out && "error" in out) loginLinkError = out.error ?? "Failed";
 	}
 
 	async function doCreateUpgradeCode(target: "trusted" | "admin") {
@@ -213,8 +214,10 @@
 						<button type="button" role="menuitem" onclick={() => doCreateUpgradeCode("admin")}>
 							{upgradeCodeCopiedFor === "admin" ? "Copied!" : "Create admin code"}
 						</button>
+						<a href="/admin" role="menuitem">Admin</a>
 					{/if}
 				{/if}
+				<a href="/account" role="menuitem">Account</a>
 				<button type="button" role="menuitem" class="profile-session-logout" onclick={logout}>Logout / new session</button>
 			</div>
 		</div>
@@ -270,8 +273,17 @@
 	}
 	.profile-session-menu {
 		display: none;
+		/* Popover is in top layer: must set theme explicitly (no inheritance) */
+		background: var(--bg, #0f0f12);
+		color: var(--text, #e4e4e7);
+		font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+		border: 1px solid var(--border, #27272a);
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+		overflow: hidden;
 	}
 	.profile-session-menu:popover-open {
+		display: flex;
 		flex-direction: column;
 		min-width: 12rem;
 	}
@@ -287,22 +299,26 @@
 		display: block;
 		width: 100%;
 		text-align: left;
-		padding: 0.4rem 0.75rem;
+		padding: 0.5rem 0.75rem;
 		font-size: 0.9rem;
-		background: none;
+		background: transparent;
 		border: none;
-		color: var(--text);
+		color: var(--text, #e4e4e7);
 		cursor: pointer;
 		text-decoration: none;
 		font-family: inherit;
+		transition: background 0.15s ease;
 	}
 	.profile-session-menu :global(button:hover),
 	.profile-session-menu :global(a:hover) {
-		background: var(--border);
+		background: var(--border, #27272a);
+	}
+	.profile-session-menu :global(a) {
+		color: var(--text, #e4e4e7);
 	}
 	.profile-session-logout:hover {
-		background: rgba(197, 48, 48, 0.2);
-		color: #c53030;
+		background: rgba(197, 48, 48, 0.25);
+		color: #f87171;
 	}
 	.profile-login-error {
 		font-size: 0.85rem;

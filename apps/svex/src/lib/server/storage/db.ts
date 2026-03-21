@@ -1,6 +1,6 @@
 /**
  * Server-only: SQLite DB for workspaces, collections, whiteboards, sessions, tokens.
- * Single DB at DATA_DIR/db.sqlite. No migration — starts fresh.
+ * Single DB at DATA_DIR/db.sqlite. Schema + optional migrations (e.g. add created_at if missing).
  */
 import Database from "better-sqlite3";
 import { mkdirSync, existsSync } from "node:fs";
@@ -17,12 +17,54 @@ function ensureDataDir(): void {
 	}
 }
 
+function runMigrations(database: Database.Database): void {
+	const now = Date.now();
+	try {
+		database.prepare(`ALTER TABLE share_tokens ADD COLUMN created_at INTEGER NOT NULL DEFAULT ${now}`).run();
+	} catch (e) {
+		if (e instanceof Error && !e.message.includes("duplicate column name")) throw e;
+	}
+	try {
+		database.prepare(`ALTER TABLE upgrade_tokens ADD COLUMN created_at INTEGER NOT NULL DEFAULT ${now}`).run();
+	} catch (e) {
+		if (e instanceof Error && !e.message.includes("duplicate column name")) throw e;
+	}
+	try {
+		database.prepare("ALTER TABLE workspaces ADD COLUMN share_links_disabled INTEGER NOT NULL DEFAULT 0").run();
+	} catch (e) {
+		if (e instanceof Error && !e.message.includes("duplicate column name")) throw e;
+	}
+	// Identity layer: accounts + session_account (no-op if tables exist)
+	try {
+		database.exec(`
+			CREATE TABLE IF NOT EXISTS accounts (
+				id TEXT PRIMARY KEY,
+				username TEXT NOT NULL UNIQUE,
+				password_hash TEXT NOT NULL,
+				role TEXT NOT NULL CHECK(role IN ('trusted', 'admin')),
+				created_at INTEGER NOT NULL,
+				updated_at INTEGER NOT NULL
+			);
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_username ON accounts(username);
+			CREATE TABLE IF NOT EXISTS session_account (
+				session_id TEXT NOT NULL PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				bound_at INTEGER NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_session_account_account ON session_account(account_id);
+		`);
+	} catch (e) {
+		if (e instanceof Error && !e.message.includes("already exists")) throw e;
+	}
+}
+
 function initDb(): Database.Database {
 	if (db) return db;
 	ensureDataDir();
 	db = new Database(DB_PATH);
 	db.pragma("journal_mode = WAL");
 	db.exec(SCHEMA);
+	runMigrations(db);
 	return db;
 }
 
@@ -35,7 +77,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
   description TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  viewed_at INTEGER NOT NULL
+  viewed_at INTEGER NOT NULL,
+  share_links_disabled INTEGER NOT NULL DEFAULT 0
 );
 
 -- Collections: belong to workspace
@@ -98,21 +141,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_session_grants_workspace ON session_grants
 CREATE UNIQUE INDEX IF NOT EXISTS idx_session_grants_whiteboard ON session_grants(session_id, whiteboard_id) WHERE whiteboard_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_session_grants_session ON session_grants(session_id);
 
--- Share tokens (replaces data/share-tokens/*.json). Multi-use until expiry.
+-- Share tokens. Token column stores HMAC-SHA256 hash only. One-time use.
 CREATE TABLE IF NOT EXISTS share_tokens (
   token TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
   workspace_id TEXT,
   room_id TEXT NOT NULL,
   access TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT 0
 );
 
--- Upgrade tokens (replaces data/upgrade-codes/*.json). One-time use.
+-- Upgrade tokens. Token column stores HMAC-SHA256 hash only. One-time use.
 CREATE TABLE IF NOT EXISTS upgrade_tokens (
   token TEXT PRIMARY KEY,
   target_user_kind TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_whiteboards_workspace ON whiteboards(workspace_id);
@@ -120,8 +165,46 @@ CREATE INDEX IF NOT EXISTS idx_whiteboards_updated ON whiteboards(updated_at);
 CREATE INDEX IF NOT EXISTS idx_workspaces_remote ON workspaces(is_remote);
 CREATE INDEX IF NOT EXISTS idx_share_tokens_expires ON share_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_upgrade_tokens_expires ON upgrade_tokens(expires_at);
+
+-- Server config (e.g. token pepper). Operator can omit pepper in config; we store it here.
+CREATE TABLE IF NOT EXISTS server_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Identity layer (Section 9): accounts for trusted/admin, optional password.
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('trusted', 'admin')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_username ON accounts(username);
+
+-- Session–account binding (one session → one account; one account → many sessions).
+CREATE TABLE IF NOT EXISTS session_account (
+  session_id TEXT NOT NULL PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  bound_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_session_account_account ON session_account(account_id);
 `;
 
 export function getDb(): Database.Database {
 	return initDb();
+}
+
+/** True if share links are disabled for this workspace (revoke policy). */
+export function isShareLinksDisabled(workspaceId: string): boolean {
+	const row = getDb()
+		.prepare("SELECT share_links_disabled FROM workspaces WHERE id = ?")
+		.get(workspaceId) as { share_links_disabled: number } | undefined;
+	return row?.share_links_disabled === 1;
+}
+
+/** Set share-links-disabled policy for a workspace. Does not revoke existing tokens (caller may revoke). */
+export function setShareLinksDisabled(workspaceId: string, disabled: boolean): void {
+	getDb().prepare("UPDATE workspaces SET share_links_disabled = ? WHERE id = ?").run(disabled ? 1 : 0, workspaceId);
 }
