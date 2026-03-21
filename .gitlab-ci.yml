@@ -15,11 +15,6 @@ variables:
   STACK_COMPOSE_SERVICES: "svex docs"
   INFRA_SRC: "docker/prod"
 
-# tips-framework shell runners: node/npm live under nvm (not default PATH) — same as .fmw-build-docker-login
-.shell-nvm:
-  before_script:
-    - . $HOME/.nvm/nvm.sh
-
 # cd STACK_DIR, login registry, compose pull/up all services (image vars from .env.deploy only)
 .prod-compose-up:
   tags:
@@ -42,9 +37,8 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — use runner host Node via nvm (see .shell-nvm).
+# Shell executor ignores `image:` — load nvm on each job (same as tips-framework; do not use extends+before_script merge — it drops nvm).
 build:
-  extends: .shell-nvm
   stage: build
   image: node:24
   tags:
@@ -63,9 +57,13 @@ build:
       - apps/svex/build
       - apps/svex/.svelte-kit
   before_script:
-    - npm ci
+    - |
+      . $HOME/.nvm/nvm.sh
+      npm ci
   script:
-    - npm run build
+    - |
+      . $HOME/.nvm/nvm.sh
+      npm run build
   artifacts:
     paths:
       - packages/svelte-excalidraw/dist
@@ -79,7 +77,6 @@ build:
 #   git tag v0.0.9 && git push origin v0.0.9
 # Requires NPM_TOKEN. Tag pipeline runs build + this job (no docker/deploy unless you add tag rules).
 publish-npm-release:
-  extends: .shell-nvm
   stage: publish
   image: node:24
   tags:
@@ -87,16 +84,19 @@ publish-npm-release:
     - "exec:shell"
   needs: [build]
   before_script:
-    - npm ci
+    - |
+      . $HOME/.nvm/nvm.sh
+      npm ci
   script:
-    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-    - npm publish -w svelte-excalidraw --access public
+    - |
+      . $HOME/.nvm/nvm.sh
+      echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+      npm publish -w svelte-excalidraw --access public
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+(-.+)?$/ # e.g. v0.0.9 or 0.0.9
 
 # dev → GitLab Package Registry (tag dev). Uses CI_JOB_TOKEN.
 publish-npm-dev:
-  extends: .shell-nvm
   stage: publish
   image: node:24
   tags:
@@ -104,12 +104,15 @@ publish-npm-dev:
     - "exec:shell"
   needs: [build]
   before_script:
-    - npm ci
+    - |
+      . $HOME/.nvm/nvm.sh
+      npm ci
   script:
     - |
+      . $HOME/.nvm/nvm.sh
       echo "registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" >> .npmrc
       echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}" >> .npmrc
-    - npm publish -w svelte-excalidraw --access public --tag dev
+      npm publish -w svelte-excalidraw --access public --tag dev
   rules:
     - if: $CI_COMMIT_BRANCH == "dev"
 
