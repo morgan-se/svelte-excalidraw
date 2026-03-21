@@ -186,7 +186,9 @@ build-docker-svex:
   script:
     - test -d "$CI_PROJECT_DIR/$INFRA_SRC" || (echo "Missing $INFRA_SRC" && exit 1)
     - test -f "$CI_PROJECT_DIR/$INFRA_SRC/compose.yml" || (echo "Missing $INFRA_SRC/compose.yml" && exit 1)
-    - mkdir -p "$STACK_PROD_DIR"
+    # Do not mkdir -p /docker/... — gitlab-runner often cannot create /docker; provision STACK_PROD_DIR on the host.
+    - test -d "$STACK_PROD_DIR" || { echo "ERROR: $STACK_PROD_DIR must already exist"; exit 1; }
+    - test -w "$STACK_PROD_DIR" || { echo "ERROR: $STACK_PROD_DIR not writable by this job"; exit 1; }
     - |
       if command -v rsync >/dev/null 2>&1; then
         rsync -av "$CI_PROJECT_DIR/$INFRA_SRC/" "$STACK_PROD_DIR/" \
