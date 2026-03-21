@@ -18,8 +18,8 @@ variables:
 # cd STACK_DIR, login registry, compose pull/up all services (image vars from .env.deploy only)
 .prod-compose-up:
   tags:
-    - runner0
-    - shell
+    - "name:runner0"
+    - "exec:shell"
   script:
     - |
       set -eu
@@ -41,8 +41,8 @@ build:
   stage: build
   image: node:24
   tags:
-    - runner0
-    - shell
+    - "name:runner0"
+    - "exec:shell"
   cache:
     key:
       files:
@@ -76,8 +76,8 @@ publish-npm-release:
   stage: publish
   image: node:24
   tags:
-    - runner0
-    - shell
+    - "name:runner0"
+    - "exec:shell"
   needs: [build]
   before_script:
     - corepack enable
@@ -93,8 +93,8 @@ publish-npm-dev:
   stage: publish
   image: node:24
   tags:
-    - runner0
-    - shell
+    - "name:runner0"
+    - "exec:shell"
   needs: [build]
   before_script:
     - corepack enable
@@ -115,8 +115,8 @@ publish-npm-dev:
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
   tags:
-    - runner0
-    - shell
+    - "name:runner0"
+    - "exec:shell"
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
@@ -150,8 +150,8 @@ build-docker-svex:
 📦@svelte-excalidraw/PROD/_prepare:
   stage: deploy
   tags:
-    - runner0
-    - shell
+    - "name:runner0"
+    - "exec:shell"
   needs: [build-docker-docs, build-docker-svex]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
