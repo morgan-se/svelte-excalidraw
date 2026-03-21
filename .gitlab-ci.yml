@@ -37,10 +37,10 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — load nvm on each job (same as tips-framework; do not use extends+before_script merge — it drops nvm).
+# Shell executor ignores `image:` — nvm + .nvmrc (Node 22): better-sqlite3/argon2 have prebuilds; Node 24 often hits node-gyp → needs make (not on runner).
 build:
   stage: build
-  image: node:24
+  image: node:22
   tags:
     - "name:runner0"
     - "exec:shell"
@@ -58,11 +58,16 @@ build:
       - apps/svex/.svelte-kit
   before_script:
     - |
+      cd "$CI_PROJECT_DIR"
       . $HOME/.nvm/nvm.sh
+      nvm install
+      nvm use
       npm ci
   script:
     - |
+      cd "$CI_PROJECT_DIR"
       . $HOME/.nvm/nvm.sh
+      nvm use
       npm run build
   artifacts:
     paths:
@@ -78,18 +83,23 @@ build:
 # Requires NPM_TOKEN. Tag pipeline runs build + this job (no docker/deploy unless you add tag rules).
 publish-npm-release:
   stage: publish
-  image: node:24
+  image: node:22
   tags:
     - "name:runner0"
     - "exec:shell"
   needs: [build]
   before_script:
     - |
+      cd "$CI_PROJECT_DIR"
       . $HOME/.nvm/nvm.sh
+      nvm install
+      nvm use
       npm ci
   script:
     - |
+      cd "$CI_PROJECT_DIR"
       . $HOME/.nvm/nvm.sh
+      nvm use
       echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public
   rules:
@@ -98,18 +108,23 @@ publish-npm-release:
 # dev → GitLab Package Registry (tag dev). Uses CI_JOB_TOKEN.
 publish-npm-dev:
   stage: publish
-  image: node:24
+  image: node:22
   tags:
     - "name:runner0"
     - "exec:shell"
   needs: [build]
   before_script:
     - |
+      cd "$CI_PROJECT_DIR"
       . $HOME/.nvm/nvm.sh
+      nvm install
+      nvm use
       npm ci
   script:
     - |
+      cd "$CI_PROJECT_DIR"
       . $HOME/.nvm/nvm.sh
+      nvm use
       echo "registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" >> .npmrc
       echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public --tag dev
