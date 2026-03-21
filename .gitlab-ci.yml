@@ -37,10 +37,10 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — nvm + .nvmrc (Node 22): better-sqlite3/argon2 have prebuilds; Node 24 often hits node-gyp → needs make (not on runner).
+# Shell executor ignores `image:` — nvm + .nvmrc. better-sqlite3 >=12.8 ships node-v137 prebuilds (Node 24); older 11.x did not → node-gyp needed make on runner.
 build:
   stage: build
-  image: node:22
+  image: node:24
   tags:
     - "name:runner0"
     - "exec:shell"
@@ -83,7 +83,7 @@ build:
 # Requires NPM_TOKEN. Tag pipeline runs build + this job (no docker/deploy unless you add tag rules).
 publish-npm-release:
   stage: publish
-  image: node:22
+  image: node:24
   tags:
     - "name:runner0"
     - "exec:shell"
@@ -108,7 +108,7 @@ publish-npm-release:
 # dev → GitLab Package Registry (tag dev). Uses CI_JOB_TOKEN.
 publish-npm-dev:
   stage: publish
-  image: node:22
+  image: node:24
   tags:
     - "name:runner0"
     - "exec:shell"
