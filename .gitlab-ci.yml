@@ -37,9 +37,7 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — nvm + .nvmrc. better-sqlite3 >=12.8 ships node-v137 prebuilds (Node 24).
-# NVM_DIR must live under CI_PROJECT_DIR: parallel jobs share ~/.nvm → tar extract races + "Text file busy" on node.
-# Runner uses set -eo pipefail; nvm.sh trips that — disable until after nvm use, then re-enable for npm.
+# Shell executor ignores `image:` — runner must have node + npm on PATH (no nvm).
 build:
   stage: build
   image: node:24
@@ -60,31 +58,11 @@ build:
       - apps/svex/.svelte-kit
   before_script:
     - |
-      ROOT="${CI_PROJECT_DIR:-$PWD}"
-      cd "$ROOT" || exit 1
-      export NVM_DIR="${ROOT}/.nvm"
-      mkdir -p "$NVM_DIR"
-      set +e
-      set +o pipefail
-      . "$HOME/.nvm/nvm.sh" || { echo "ERROR: source nvm.sh failed"; exit 1; }
-      nvm install || { echo "ERROR: nvm install failed"; exit 1; }
-      nvm use || { echo "ERROR: nvm use failed"; exit 1; }
-      hash -r 2>/dev/null || true
-      set -e
-      set -o pipefail
+      cd "${CI_PROJECT_DIR:-$PWD}"
       npm ci
   script:
     - |
-      ROOT="${CI_PROJECT_DIR:-$PWD}"
-      cd "$ROOT" || exit 1
-      export NVM_DIR="${ROOT}/.nvm"
-      set +e
-      set +o pipefail
-      . "$HOME/.nvm/nvm.sh" || { echo "ERROR: source nvm.sh failed"; exit 1; }
-      nvm use || { echo "ERROR: nvm use failed"; exit 1; }
-      hash -r 2>/dev/null || true
-      set -e
-      set -o pipefail
+      cd "${CI_PROJECT_DIR:-$PWD}"
       npm run build
   artifacts:
     paths:
@@ -107,31 +85,11 @@ publish-npm-release:
   needs: [build]
   before_script:
     - |
-      ROOT="${CI_PROJECT_DIR:-$PWD}"
-      cd "$ROOT" || exit 1
-      export NVM_DIR="${ROOT}/.nvm"
-      mkdir -p "$NVM_DIR"
-      set +e
-      set +o pipefail
-      . "$HOME/.nvm/nvm.sh" || { echo "ERROR: source nvm.sh failed"; exit 1; }
-      nvm install || { echo "ERROR: nvm install failed"; exit 1; }
-      nvm use || { echo "ERROR: nvm use failed"; exit 1; }
-      hash -r 2>/dev/null || true
-      set -e
-      set -o pipefail
+      cd "${CI_PROJECT_DIR:-$PWD}"
       npm ci
   script:
     - |
-      ROOT="${CI_PROJECT_DIR:-$PWD}"
-      cd "$ROOT" || exit 1
-      export NVM_DIR="${ROOT}/.nvm"
-      set +e
-      set +o pipefail
-      . "$HOME/.nvm/nvm.sh" || { echo "ERROR: source nvm.sh failed"; exit 1; }
-      nvm use || { echo "ERROR: nvm use failed"; exit 1; }
-      hash -r 2>/dev/null || true
-      set -e
-      set -o pipefail
+      cd "${CI_PROJECT_DIR:-$PWD}"
       echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public
   rules:
@@ -147,31 +105,11 @@ publish-npm-dev:
   needs: [build]
   before_script:
     - |
-      ROOT="${CI_PROJECT_DIR:-$PWD}"
-      cd "$ROOT" || exit 1
-      export NVM_DIR="${ROOT}/.nvm"
-      mkdir -p "$NVM_DIR"
-      set +e
-      set +o pipefail
-      . "$HOME/.nvm/nvm.sh" || { echo "ERROR: source nvm.sh failed"; exit 1; }
-      nvm install || { echo "ERROR: nvm install failed"; exit 1; }
-      nvm use || { echo "ERROR: nvm use failed"; exit 1; }
-      hash -r 2>/dev/null || true
-      set -e
-      set -o pipefail
+      cd "${CI_PROJECT_DIR:-$PWD}"
       npm ci
   script:
     - |
-      ROOT="${CI_PROJECT_DIR:-$PWD}"
-      cd "$ROOT" || exit 1
-      export NVM_DIR="${ROOT}/.nvm"
-      set +e
-      set +o pipefail
-      . "$HOME/.nvm/nvm.sh" || { echo "ERROR: source nvm.sh failed"; exit 1; }
-      nvm use || { echo "ERROR: nvm use failed"; exit 1; }
-      hash -r 2>/dev/null || true
-      set -e
-      set -o pipefail
+      cd "${CI_PROJECT_DIR:-$PWD}"
       echo "registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" >> .npmrc
       echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public --tag dev
