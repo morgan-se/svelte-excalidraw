@@ -1,11 +1,20 @@
 # svelte-excalidraw: npm publish + GitLab images + PROD on prod1
 # Single compose: docker/prod/compose.yml → /docker/svex (see docker/prod/README.md)
+#
+# Stages: deploy before publish — ship main first; tag/npm release when you’re ready.
+#
+# Shell + nvm (tips-framework style): same pattern as .fmw-build-docker-login — `. $HOME/.nvm/nvm.sh`
+# before npm. Earlier pain was NOT “nvm is wrong”, it was:
+#   - extends + child before_script replaced the template’s before_script (nvm never ran).
+#   - optional: parallel jobs sharing ~/.nvm → tar races / “Text file busy” (fmw often builds in Docker).
+#   - runner set -eo pipefail + nvm.sh internals → silent exit unless you relax around source (if it recurs).
+#   - treating `. nvm.sh || exit 1` as failure — nvm.sh can leave $? != 0 even when nvm loaded.
 
 stages:
   - build
-  - publish
   - docker
   - deploy
+  - publish
 
 variables:
   NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.npm-cache"
@@ -37,7 +46,7 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — runner must have node + npm on PATH (no nvm).
+# Shell executor ignores `image:` — load nvm like tips-framework, then npm.
 build:
   stage: build
   image: node:24
@@ -59,10 +68,12 @@ build:
   before_script:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
+      . "$HOME/.nvm/nvm.sh"
       npm ci
   script:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
+      . "$HOME/.nvm/nvm.sh"
       npm run build
   artifacts:
     paths:
@@ -75,7 +86,7 @@ build:
 # Only on release tags — not on every main push (avoids "version already exists").
 # Flow: bump packages/svelte-excalidraw version on main → tag → push tag:
 #   git tag v0.0.9 && git push origin v0.0.9
-# Requires NPM_TOKEN. Tag pipeline runs build + this job (no docker/deploy unless you add tag rules).
+# Requires NPM_TOKEN. Tag pipeline: build then this job (deploy already happened on main push).
 publish-npm-release:
   stage: publish
   image: node:24
@@ -86,10 +97,12 @@ publish-npm-release:
   before_script:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
+      . "$HOME/.nvm/nvm.sh"
       npm ci
   script:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
+      . "$HOME/.nvm/nvm.sh"
       echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public
   rules:
@@ -106,10 +119,12 @@ publish-npm-dev:
   before_script:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
+      . "$HOME/.nvm/nvm.sh"
       npm ci
   script:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
+      . "$HOME/.nvm/nvm.sh"
       echo "registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" >> .npmrc
       echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public --tag dev
