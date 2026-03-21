@@ -37,7 +37,8 @@ variables:
       docker compose -f "$COMPOSE_FILE" --env-file .env.deploy up -d --remove-orphans $STACK_COMPOSE_SERVICES
 
 # ----------------- BUILD -----------------
-# Shell executor ignores `image:` — nvm + .nvmrc. better-sqlite3 >=12.8 ships node-v137 prebuilds (Node 24); older 11.x did not → node-gyp needed make on runner.
+# Shell executor ignores `image:` — nvm + .nvmrc. better-sqlite3 >=12.8 ships node-v137 prebuilds (Node 24).
+# NVM_DIR must live under CI_PROJECT_DIR: parallel jobs share ~/.nvm → tar extract races + "Text file busy" on node.
 build:
   stage: build
   image: node:24
@@ -59,15 +60,20 @@ build:
   before_script:
     - |
       cd "$CI_PROJECT_DIR"
-      . $HOME/.nvm/nvm.sh
+      export NVM_DIR="${CI_PROJECT_DIR}/.nvm"
+      mkdir -p "$NVM_DIR"
+      . "$HOME/.nvm/nvm.sh"
       nvm install
       nvm use
+      hash -r
       npm ci
   script:
     - |
       cd "$CI_PROJECT_DIR"
-      . $HOME/.nvm/nvm.sh
+      export NVM_DIR="${CI_PROJECT_DIR}/.nvm"
+      . "$HOME/.nvm/nvm.sh"
       nvm use
+      hash -r
       npm run build
   artifacts:
     paths:
@@ -91,15 +97,20 @@ publish-npm-release:
   before_script:
     - |
       cd "$CI_PROJECT_DIR"
-      . $HOME/.nvm/nvm.sh
+      export NVM_DIR="${CI_PROJECT_DIR}/.nvm"
+      mkdir -p "$NVM_DIR"
+      . "$HOME/.nvm/nvm.sh"
       nvm install
       nvm use
+      hash -r
       npm ci
   script:
     - |
       cd "$CI_PROJECT_DIR"
-      . $HOME/.nvm/nvm.sh
+      export NVM_DIR="${CI_PROJECT_DIR}/.nvm"
+      . "$HOME/.nvm/nvm.sh"
       nvm use
+      hash -r
       echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public
   rules:
@@ -116,15 +127,20 @@ publish-npm-dev:
   before_script:
     - |
       cd "$CI_PROJECT_DIR"
-      . $HOME/.nvm/nvm.sh
+      export NVM_DIR="${CI_PROJECT_DIR}/.nvm"
+      mkdir -p "$NVM_DIR"
+      . "$HOME/.nvm/nvm.sh"
       nvm install
       nvm use
+      hash -r
       npm ci
   script:
     - |
       cd "$CI_PROJECT_DIR"
-      . $HOME/.nvm/nvm.sh
+      export NVM_DIR="${CI_PROJECT_DIR}/.nvm"
+      . "$HOME/.nvm/nvm.sh"
       nvm use
+      hash -r
       echo "registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" >> .npmrc
       echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public --tag dev

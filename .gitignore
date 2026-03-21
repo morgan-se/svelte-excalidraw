@@ -1,3 +1,6 @@
+# CI / optional per-project nvm (see .gitlab-ci.yml NVM_DIR)
+.nvm/
+
 node_modules
 build
 dist
