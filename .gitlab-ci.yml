@@ -89,7 +89,7 @@ build:
 # Only on release tags — not on every main push (avoids "version already exists").
 # Flow: bump packages/svelte-excalidraw version on main → tag → push tag:
 #   git tag v0.0.9 && git push origin v0.0.9
-# Requires NPM_TOKEN. Tag pipeline: build then this job (deploy already happened on main push).
+# Requires NPM_TOKEN. Runs only on tag pipelines (e.g. v0.1.0). If you only push tags to GitHub, GitLab mirrors often skip tags — push tag to GitLab or enable tag mirroring (see docs/RELEASING.md).
 publish-npm-release:
   stage: publish
   image: node:24
