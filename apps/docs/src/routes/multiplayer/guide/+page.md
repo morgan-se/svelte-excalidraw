@@ -74,7 +74,8 @@ Create **`src/routes/room/[roomId]/+page.svelte`**:
 ```svelte
 <script>
   import { page } from "$app/state";
-  import { ExcalidrawMultiplayer, createDefaultAdapter } from "svelte-excalidraw";
+  import { ExcalidrawMultiplayer } from "svelte-excalidraw";
+  import { createDefaultAdapter } from "svelte-excalidraw/adapter";
 
   const adapter = createDefaultAdapter({
     streamUrl: (roomId) => `/room/${roomId}`,

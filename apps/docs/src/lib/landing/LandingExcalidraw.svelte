@@ -5,11 +5,11 @@
 	import { getRandomUsername } from "@excalidraw/random-username";
 	import {
 		ExcalidrawMultiplayer,
-		createDefaultAdapter,
 		CollaboratorProfile,
 		COLLABORATOR_COLORS,
 		type CollaboratorColorHex,
 	} from "svelte-excalidraw";
+	import { createDefaultAdapter } from "svelte-excalidraw/adapter";
 	import {
 		generateRoomCode,
 		normalizeRoomCode,

@@ -26,7 +26,8 @@ Multiplayer canvas. Props: `roomId`, `userInfo`, `adapter`, optional `theme`, `U
 
 ```svelte
 <script>
-  import { ExcalidrawMultiplayer, createDefaultAdapter } from "svelte-excalidraw";
+  import { ExcalidrawMultiplayer } from "svelte-excalidraw";
+  import { createDefaultAdapter } from "svelte-excalidraw/adapter";
 
   const adapter = createDefaultAdapter({ streamUrl: (roomId) => `/room/${roomId}` });
 </script>

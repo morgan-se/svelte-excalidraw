@@ -16,7 +16,8 @@ Props: `roomId: string`, `userInfo: RoomUserInfo`, `adapter: ExcalidrawMultiplay
 
 ```svelte
 <script>
-  import { ExcalidrawMultiplayer, createDefaultAdapter } from "svelte-excalidraw";
+  import { ExcalidrawMultiplayer } from "svelte-excalidraw";
+  import { createDefaultAdapter } from "svelte-excalidraw/adapter";
 
   const adapter = createDefaultAdapter({
     streamUrl: (roomId) => `/room/${roomId}`,
@@ -35,7 +36,7 @@ Props: `roomId: string`, `userInfo: RoomUserInfo`, `adapter: ExcalidrawMultiplay
 Returns `ExcalidrawMultiplayerAdapter`. Options: `streamUrl: (roomId: string) => string` (full URL for the room stream).
 
 ```js
-import { createDefaultAdapter } from "svelte-excalidraw";
+import { createDefaultAdapter } from "svelte-excalidraw/adapter";
 
 const adapter = createDefaultAdapter({
   streamUrl: (roomId) => `/room/${roomId}`,
