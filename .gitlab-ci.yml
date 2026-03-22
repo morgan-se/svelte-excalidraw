@@ -89,7 +89,7 @@ build:
 # Only on release tags — not on every main push (avoids "version already exists").
 # Flow: bump packages/svelte-excalidraw version on main → tag → push tag:
 #   git tag v0.0.9 && git push origin v0.0.9
-# Requires NPM_TOKEN. Runs only on tag pipelines (e.g. v0.1.0). If you only push tags to GitHub, GitLab mirrors often skip tags — push tag to GitLab or enable tag mirroring (see docs/RELEASING.md).
+# Requires NPM_TOKEN. Tag pipeline only; job is manual (Play in GitLab UI). See docs/RELEASING.md (NPM_TOKEN + Protected tags).
 publish-npm-release:
   stage: publish
   image: node:24
@@ -106,10 +106,17 @@ publish-npm-release:
     - |
       cd "${CI_PROJECT_DIR:-$PWD}"
       . "$HOME/.nvm/nvm.sh"
+      if [ -z "${NPM_TOKEN:-}" ]; then
+        echo "ERROR: NPM_TOKEN is empty in this job."
+        echo "Fix: GitLab → Settings → CI/CD → Variables → NPM_TOKEN"
+        echo "If the variable is Protected, either add this tag under Settings → Repository → Protected tags, OR disable Protected on NPM_TOKEN."
+        exit 1
+      fi
       echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
       npm publish -w svelte-excalidraw --access public
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+(-.+)?$/ # e.g. v0.0.9 or 0.0.9
+    - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+(-.+)?$/
+      when: manual
 
 # dev → GitLab Package Registry (tag dev). Uses CI_JOB_TOKEN.
 publish-npm-dev:

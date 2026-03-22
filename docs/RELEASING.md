@@ -21,11 +21,25 @@ If the repo is **mirrored GitHub → GitLab**, many mirrors **do not copy tags**
 
 ### Check
 
-On GitLab: **Code → Tags** — **`v0.1.0`** must appear. Then open **Build → Pipelines** and filter by tag **`v0.1.0`**; you should see **build** + **publish-npm-release**.
+On GitLab: **Code → Tags** — **`v0.1.0`** must appear. Then open **Build → Pipelines** and filter by tag **`v0.1.0`**; you should see **build** + **publish-npm-release** (npm job is **manual** — click **Play** ▶).
+
+## `ENEEDAUTH` / “need auth” in CI
+
+Usually **`NPM_TOKEN` is empty in the job**, not “wrong password”.
+
+GitLab **Protected** variables are only passed when the pipeline runs on a **protected branch** or **protected tag**. If **`NPM_TOKEN` is marked Protected** and your release tag (e.g. **`v0.1.0`**) is **not** a protected tag, the variable is **blank** → npm reports **`ENEEDAUTH`**.
+
+**Fix (one of):**
+
+1. **Settings → Repository → Protected tags** — protect **`v*`** or **`v0.1.0`**, **or**
+2. Edit **`NPM_TOKEN`** → **uncheck Protected** (fine if repo is private and you trust maintainers), **or**
+3. Use a **Deploy token / project access token** with narrower scope if your org allows unprotected vars only.
+
+Also confirm **Settings → CI/CD → Variables**: key is exactly **`NPM_TOKEN`**, **not** masked in a way that breaks multiline (use single-line token), and **no** extra spaces.
 
 ## Release checklist
 
-1. **`NPM_TOKEN`** in **Settings → CI/CD → Variables** (npm automation token, publish scope).
+1. **`NPM_TOKEN`** in **Settings → CI/CD → Variables** (npm [automation token](https://docs.npmjs.com/creating-and-viewing-access-tokens), type **Automation** or **Publish**, scope includes the package).
 2. **`packages/svelte-excalidraw/package.json`** version = what you want on npm.
 3. Commit on **`main`**, push **`main`** to GitLab.
 4. **`git tag vX.Y.Z`** on that commit, **push the tag to GitLab** (see above).
