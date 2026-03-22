@@ -12,7 +12,5 @@ export type {
 	RoomPush,
 	RoomUserInfo,
 } from "./types.js";
-export {
-	createDefaultAdapter,
-	type DefaultAdapterOptions,
-} from "./default-adapter.js";
+// createDefaultAdapter uses $app/server and must NOT be in the client bundle.
+// Import it from "svelte-excalidraw/adapter" instead.

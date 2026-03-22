@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
+	import { BROWSER as browser } from "esm-env";
 	import type { RoomUserInfo } from "./multiplayer/types.js";
 	import type { ExcalidrawMultiplayerAdapter } from "./multiplayer/types.js";
 

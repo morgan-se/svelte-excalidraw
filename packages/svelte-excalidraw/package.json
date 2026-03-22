@@ -1,6 +1,6 @@
 {
   "name": "svelte-excalidraw",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Svelte wrapper for Excalidraw with multiplayer",
   "scripts": {
     "build": "svelte-kit sync && svelte-package",
@@ -61,8 +61,8 @@
     "lodash-es": ">=4.17.23"
   },
   "peerDependencies": {
-    "svelte": "^5.0.0",
-    "@sveltejs/kit": "^2.0.0"
+    "@sveltejs/kit": "^2.0.0",
+    "svelte": "^5.0.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.2",
@@ -82,10 +82,11 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "dependencies": {
-    "valibot": "^1.2.0",
     "@excalidraw/excalidraw": "0.18.0-3a5ef40",
+    "esm-env": "^1.2.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "sveltekit-sse": "^0.14.3"
+    "sveltekit-sse": "^0.14.3",
+    "valibot": "^1.2.0"
   }
 }

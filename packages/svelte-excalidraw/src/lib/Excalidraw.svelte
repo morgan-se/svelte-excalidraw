@@ -17,7 +17,7 @@
 </script>
 
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { BROWSER as browser } from "esm-env";
   import "./hotfix/processNotDefined.js";
   import "@excalidraw/excalidraw/index.css";
 

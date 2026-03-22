@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
+	import { BROWSER as browser } from "esm-env";
 	import { onDestroy, onMount } from "svelte";
 	import Excalidraw from "./Excalidraw.svelte";
 	import {
