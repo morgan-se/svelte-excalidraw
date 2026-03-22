@@ -1,5 +1,6 @@
 # svelte-excalidraw: npm publish + GitLab images + PROD on prod1
-# Single compose: docker/prod/ → STACK_PROD_DIR (default under gitlab-runner $HOME; override in CI variables)
+# Registry tags: tips-framework style — single ci-$CI_PIPELINE_ID per pipeline (not commit SHA).
+# PROD deploy runs on prod-1 shell runner (docker + traefik `frontend` live there), not runner0.
 #
 # Stages: deploy before publish — ship main first; tag/npm release when you’re ready.
 #
@@ -21,16 +22,13 @@ variables:
   # Image repo roots (build -t … only). Do not use for compose: untagged values become :latest in shell env and override .env.deploy.
   DOCS_IMAGE: $CI_REGISTRY_IMAGE/docs
   SVEX_IMAGE: $CI_REGISTRY_IMAGE/svex
-  # Writable on shell runner without sudo (mkdir under $HOME). Override to e.g. /docker/svex if that path exists on runner0.
-  STACK_PROD_DIR: "/home/gitlab-runner/stack-deploy/svelte-excalidraw"
+  # PROD stack dir on prod-1 host (prepare + compose up). runner0 only builds & pushes images.
+  STACK_PROD_DIR: "/docker/svex"
   STACK_COMPOSE_SERVICES: "svex docs"
   INFRA_SRC: "docker/prod"
 
-# cd STACK_DIR, login registry, compose pull/up all services (image tags from .env.deploy only)
+# cd STACK_DIR, login registry, compose pull/up (tags from .env.deploy). tags: set on job — use prod-1 for PROD stack.
 .prod-compose-up:
-  tags:
-    - "name:runner0"
-    - "exec:shell"
   script:
     - |
       set -eu
@@ -158,9 +156,8 @@ build-docker-docs:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "dev"
   script:
-    - docker build -t $DOCS_IMAGE:$CI_COMMIT_SHA -t $DOCS_IMAGE:$CI_COMMIT_REF_SLUG -f apps/docs/Dockerfile .
-    - docker push $DOCS_IMAGE:$CI_COMMIT_SHA
-    - docker push $DOCS_IMAGE:$CI_COMMIT_REF_SLUG
+    - docker build -t $DOCS_IMAGE:ci-$CI_PIPELINE_ID -f apps/docs/Dockerfile .
+    - docker push $DOCS_IMAGE:ci-$CI_PIPELINE_ID
 
 build-docker-svex:
   extends: .docker-build
@@ -170,9 +167,8 @@ build-docker-svex:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "dev"
   script:
-    - docker build -t $SVEX_IMAGE:$CI_COMMIT_SHA -t $SVEX_IMAGE:$CI_COMMIT_REF_SLUG -f apps/svex/Dockerfile .
-    - docker push $SVEX_IMAGE:$CI_COMMIT_SHA
-    - docker push $SVEX_IMAGE:$CI_COMMIT_REF_SLUG
+    - docker build -t $SVEX_IMAGE:ci-$CI_PIPELINE_ID -f apps/svex/Dockerfile .
+    - docker push $SVEX_IMAGE:ci-$CI_PIPELINE_ID
 
 # ----------------- DEPLOY (PROD / main only) -----------------
 # One compose on prod; `compose up -d` only recreates a service when its image/config actually changes.
@@ -180,8 +176,8 @@ build-docker-svex:
 📦@svelte-excalidraw/PROD/_prepare:
   stage: deploy
   tags:
-    - "name:runner0"
-    - "exec:shell"
+    - name:prod-1
+    - exec:shell
   needs: [build-docker-docs, build-docker-svex]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -204,8 +200,9 @@ build-docker-svex:
       fi
     - |
       cat > "$STACK_PROD_DIR/.env.deploy" <<EOF
-      SVEX_IMAGE=${CI_REGISTRY_IMAGE}/svex:${CI_COMMIT_SHA}
-      DOCS_IMAGE=${CI_REGISTRY_IMAGE}/docs:${CI_COMMIT_SHA}
+      SVEX_IMAGE=${CI_REGISTRY_IMAGE}/svex:ci-${CI_PIPELINE_ID}
+      DOCS_IMAGE=${CI_REGISTRY_IMAGE}/docs:ci-${CI_PIPELINE_ID}
+      DOCKER_TAG=ci-${CI_PIPELINE_ID}
       CI_COMMIT_SHA=${CI_COMMIT_SHA}
       CI_PIPELINE_ID=${CI_PIPELINE_ID}
       EOF
@@ -213,6 +210,9 @@ build-docker-svex:
 🚀@svelte-excalidraw/PROD/stack:
   extends: .prod-compose-up
   stage: deploy
+  tags:
+    - name:prod-1
+    - exec:shell
   needs: [📦@svelte-excalidraw/PROD/_prepare, build-docker-docs, build-docker-svex]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"

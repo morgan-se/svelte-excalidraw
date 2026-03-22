@@ -1,4 +1,4 @@
-# Single stack: svex + docs. CI syncs here from docker/prod/ (default path: STACK_PROD_DIR in .gitlab-ci.yml)
+# Single stack: svex + docs. CI writes .env.deploy with images tagged ci-$CI_PIPELINE_ID (tips-framework style).
 name: svelte-excalidraw
 
 services:
