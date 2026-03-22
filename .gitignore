@@ -1,5 +1,6 @@
 # Optional: per-project NVM_DIR (local dev only; CI does not use nvm)
 .nvm/
+.docker-ci/
 
 node_modules
 build

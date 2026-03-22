@@ -141,11 +141,14 @@ publish-npm-dev:
     - docker:24-dind
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
+    # Shell runner: docs + svex run in parallel → both used ~/.docker/config.json → login/push race → random unauthorized on one image
+    DOCKER_CONFIG: "${CI_PROJECT_DIR}/.docker-ci"
   tags:
     - "name:runner0"
     - "exec:shell"
   before_script:
-    # CI_REGISTRY_PASSWORD is the job token; use stdin (special chars / GitLab docs). Not touched by deploy job unset of DOCS_IMAGE/SVEX_IMAGE.
+    - mkdir -p "$DOCKER_CONFIG"
+    # CI_REGISTRY_PASSWORD is the job token; use stdin (GitLab docs).
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
 
 build-docker-docs:
