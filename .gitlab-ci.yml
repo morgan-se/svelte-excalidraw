@@ -18,6 +18,7 @@ stages:
 
 variables:
   NPM_CONFIG_CACHE: "${CI_PROJECT_DIR}/.npm-cache"
+  # Image repo roots (build -t … only). Do not use for compose: untagged values become :latest in shell env and override .env.deploy.
   DOCS_IMAGE: $CI_REGISTRY_IMAGE/docs
   SVEX_IMAGE: $CI_REGISTRY_IMAGE/svex
   # Writable on shell runner without sudo (mkdir under $HOME). Override to e.g. /docker/svex if that path exists on runner0.
@@ -25,7 +26,7 @@ variables:
   STACK_COMPOSE_SERVICES: "svex docs"
   INFRA_SRC: "docker/prod"
 
-# cd STACK_DIR, login registry, compose pull/up all services (image vars from .env.deploy only)
+# cd STACK_DIR, login registry, compose pull/up all services (image tags from .env.deploy only)
 .prod-compose-up:
   tags:
     - "name:runner0"
@@ -34,6 +35,9 @@ variables:
     - |
       set -eu
       cd "$STACK_DIR"
+      # GitLab job exports DOCS_IMAGE/SVEX_IMAGE without tag → compose would resolve :latest over --env-file
+      unset DOCS_IMAGE SVEX_IMAGE || true
+      test -f .env.deploy || { echo "ERROR: missing .env.deploy in $STACK_DIR (run PROD/_prepare first)"; exit 1; }
       echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
       if [ -f docker-compose.yml ]; then
         COMPOSE_FILE=docker-compose.yml
