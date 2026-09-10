@@ -17,3 +17,6 @@ data/
 # Generated and runtime data (do not commit)
 apps/docs/build/
 apps/svex/data/
+
+# allow dist
+!packages/svelte-excalidraw/dist
