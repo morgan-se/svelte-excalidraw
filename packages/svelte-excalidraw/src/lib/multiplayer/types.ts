@@ -4,9 +4,8 @@
  * implements this interface so the same ExcalidrawMultiplayer component works everywhere.
  */
 
-import type { BinaryFiles } from "@excalidraw/excalidraw/types";
-import type { ExcalidrawElement } from "@excalidraw/element/types";
-import type { Collaborator } from "@excalidraw/excalidraw/types";
+import type { BinaryFiles, Collaborator } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 
 /** Full document for bootstrap / initial load. Always include files (use {} if none). */
 export interface ExcalidrawDocument {

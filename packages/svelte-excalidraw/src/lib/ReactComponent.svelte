@@ -4,17 +4,26 @@
   import { createRoot as createReactRoot } from "react-dom/client";
   import { onMount, onDestroy } from "svelte";
 
+  interface Props {
+    this: any;
+    children?: any;
+    class?: string;
+    [key: string]: any;
+  }
+
   let container = $state(undefined as any as HTMLDivElement);
   let reactRoot = $state(undefined as any as ReturnType<typeof createReactRoot>);
 
-  const { this: el, children, class: classNames, ...props } = $props();
+  const { this: el, children = undefined, class: classNames = undefined, ...props }: Props = $props();
 
   onMount(() => {
     reactRoot = createReactRoot(container);
   });
 
   $effect(() => {
-    reactRoot.render(createElement(el, props, children));
+    if (reactRoot) {
+      reactRoot.render(createElement(el, props, children));
+    }
   });
 
   onDestroy(() => {

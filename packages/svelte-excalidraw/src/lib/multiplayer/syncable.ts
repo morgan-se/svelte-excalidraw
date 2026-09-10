@@ -4,7 +4,7 @@
  * so other clients can remove them. Matches Excalidraw app logic; package doesn't export it.
  */
 import { isInvisiblySmallElement } from "@excalidraw/excalidraw";
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 
 /** Deleted elements older than this are not synced (everyone has already removed them). */
 export const DELETED_ELEMENT_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24h

@@ -119,7 +119,7 @@ export function createDefaultAdapter(options: DefaultAdapterOptions): Excalidraw
 		async push(roomId: string, userId: string, payload: RoomPush): Promise<void> {
 			switch (payload.type) {
 				case "elements":
-					await pushElementsRemote({ roomId, userId, elements: payload.elements });
+					await pushElementsRemote({ roomId, userId, elements: payload.elements as any });
 					break;
 				case "files":
 					await pushFilesRemote({ roomId, userId, files: { ...payload.files } });

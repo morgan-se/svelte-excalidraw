@@ -3,7 +3,7 @@
  * Element push is gated in the Core by scene version.
  */
 
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 import { getSyncableElements } from "../syncable.js";
 	import type { ExcalidrawMultiplayerAdapter, AwarenessUpdate, SceneBounds } from "../types.js";

@@ -3,7 +3,7 @@
  */
 
 import type { ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types";
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { RoomUserInfo, RoomConnection, RoomEvent } from "../types.js";
 
 export interface ConnectionCallbacks {
