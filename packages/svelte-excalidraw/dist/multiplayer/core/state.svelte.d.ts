@@ -1,0 +1,16 @@
+/**
+ * Runes-based multiplayer session state. Call createMultiplayerSessionState()
+ * from a component so state is bound to that instance.
+ */
+import type { ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types";
+import type { Collaborator } from "@excalidraw/excalidraw/types";
+import type { RoomConnection } from "../types.js";
+export interface MultiplayerSessionState {
+    get initialData(): Promise<ExcalidrawInitialDataState>;
+    resolveInitialData(value: ExcalidrawInitialDataState): void;
+    get collaborators(): Map<string, Collaborator>;
+    set collaborators(value: Map<string, Collaborator>);
+    get connection(): RoomConnection | null;
+    set connection(value: RoomConnection | null);
+}
+export declare function createMultiplayerSessionState(): MultiplayerSessionState;
