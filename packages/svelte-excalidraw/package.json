@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "description": "Svelte wrapper for Excalidraw with multiplayer",
   "scripts": {
+    "prepare": "npm run build",
     "build": "svelte-kit sync && svelte-package",
     "dev": "svelte-kit sync && svelte-package --watch",
     "prepublishOnly": "npm run build",
