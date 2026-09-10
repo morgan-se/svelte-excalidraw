@@ -4,7 +4,6 @@
 
 node_modules
 build
-dist
 .svelte-kit
 .env
 .env.*
@@ -18,5 +17,4 @@ data/
 apps/docs/build/
 apps/svex/data/
 
-# allow dist
-!packages/svelte-excalidraw/dist
+.idea

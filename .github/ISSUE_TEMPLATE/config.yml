@@ -1,8 +1,0 @@
-blank_issues_enabled: true
-contact_links:
-  - name: Documentation
-    url: https://svelte-excalidraw.tips.dev
-    about: Docs and examples
-  - name: Try the app
-    url: https://svex.tips.dev
-    about: Live whiteboard demo
